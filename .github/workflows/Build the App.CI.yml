@@ -1,0 +1,26 @@
+name: Build the App
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v1
+      name: Checkout Code
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v1
+      
+    - name: Install dependencies
+      run: dotnet restore
+
+    - name: Build
+      run: msbuild ALDExplorer.sln /p:Configuration=Release
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: ALDExplorer
+        path: ALDExplorer/bin/x86/Release/net40/*
