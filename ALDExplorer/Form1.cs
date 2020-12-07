@@ -20,6 +20,8 @@ namespace ALDExplorer
         //AldFileCollection loadedAldFiles = null;
         public Form1()
         {
+            Debug.Listeners.Add(new TextWriterTraceListener(Console.Out));
+            Debug.AutoFlush = true;
             InitializeComponent();
         }
 
@@ -64,7 +66,7 @@ namespace ALDExplorer
             {
                 loadedAldFile.ReadFile(fileName);
             }
-            catch (InvalidDataException ex)
+            catch (InvalidDataException)
             {
                 MessageBox.Show(this, "The loaded file is not a valid AliceSoft .ALD, .AFA, .ALK, or .DAT file.", "ALDExplorer", MessageBoxButtons.OK, MessageBoxIcon.Stop);
             }
@@ -254,6 +256,10 @@ namespace ALDExplorer
             else if (ext == ".swf" || ext == ".aff")
             {
                 imageIndex = 6;
+            }
+            else if (ext == ".dcf" || ext == ".pcf")
+            {
+                imageIndex = 4;
             }
             else if (ext == ".sco")
             {
@@ -1210,6 +1216,8 @@ namespace ALDExplorer
             //bool fileExtensionHandled = false;
             bool fileExtensionSupported =
                 (extension == ".vsp") ||
+                (extension == ".dcf") ||
+                (extension == ".pcf") ||
                 (extension == ".pms") ||
                 (extension == ".qnt") ||
                 (extension == ".ajp") ||
@@ -1351,6 +1359,8 @@ namespace ALDExplorer
 
             //first try just the loader for the matching file extension
             if (bitmap == null && extension == ".qnt") { try { bitmap = ImageConverter.LoadQnt(fileBytes); } catch { } }
+            if (bitmap == null && extension == ".dcf") { bitmap = ImageConverter.LoadXcf(fileBytes);  }
+            if (bitmap == null && extension == ".pcf") { bitmap = ImageConverter.LoadXcf(fileBytes); }
             if (bitmap == null && extension == ".png") { try { bitmap = new FreeImageBitmap(fileStream, FREE_IMAGE_FORMAT.FIF_PNG); } catch { } }
             if (bitmap == null && extension == ".pms") { try { bitmap = ImageConverter.LoadPms(fileBytes); } catch { } }
             if (bitmap == null && extension == ".ajp") { try { bitmap = ImageConverter.LoadAjp(fileBytes); } catch { } }
@@ -1604,7 +1614,7 @@ namespace ALDExplorer
             {
                 string extension = Path.GetExtension(selectedEntry.FileName).ToLowerInvariant();
                 string initialFileName = selectedEntry.FileName;
-                if (extension == ".vsp" || extension == ".pms" || extension == ".qnt" || extension == ".bmp" || extension == ".ajp")
+                if (extension == ".vsp" || extension == ".pms" || extension == ".qnt" || extension == ".bmp" || extension == ".ajp" || extension == ".dcf" || extension == ".pcf")
                 {
                     openFileDialog.Filter = "PNG Files (*.png)|*.png|All Files (*.*)|*.*";
                     initialFileName = Path.ChangeExtension(initialFileName, ".png");

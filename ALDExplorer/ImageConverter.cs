@@ -11,6 +11,8 @@ using ZLibNet;
 using System.Diagnostics;
 using System.Globalization;
 
+using System.Windows.Forms;
+
 namespace ALDExplorer
 {
     public class PmsHeader : ICloneable
@@ -526,12 +528,38 @@ namespace ALDExplorer
             }
         }
 
-        public static FreeImageBitmap LoadQnt(byte[] bytes)
+        public static byte[] SkipXcfHeader(byte[] bytes)
+        {
+            var ms1 = new MemoryStream(bytes);
+            var br1 = new BinaryReader(ms1);
+            while (br1.BaseStream.Position < br1.BaseStream.Length)
+            {
+                var tag = (new Tag()).ReadTag(br1);
+                if (tag.TagName == "pcgd" || tag.TagName == "dcgd")
+                    return tag.TagData;
+            }
+            //br1.BaseStream.Position = ((br1.BaseStream.Position - 1) | 3) + 1;
+            return null;
+        }
+
+        public static FreeImageBitmap LoadXcf(byte[] bytes)
         {
             try
             {
-                return Qnt.LoadImage(bytes);
+                return LoadQnt(SkipXcfHeader(bytes));
+            }
+            catch
+            {
+                return null;
+            }
+        }
 
+        public static FreeImageBitmap LoadQnt(byte[] bytes)
+        {
+            if (bytes == null) return null;
+            try
+            {
+                return Qnt.LoadImage(bytes);
             }
             catch
             {
@@ -916,11 +944,13 @@ namespace ALDExplorer
                 {
                     pms.extraData = br.ReadBytes(extraDataSize);
                 }
-                //if (pms.addressOfComment != 0)
-                //{
-                //    ms.Position = pms.addressOfComment;
-                //    pms.comment = br.ReadStringNullTerminated();
-                //}
+                /*
+                if (pms.addressOfComment != 0)
+                {
+                   ms.Position = pms.addressOfComment;
+                   pms.comment = br.ReadStringNullTerminated();
+                }
+                */
 
                 return pms;
             }
@@ -972,7 +1002,7 @@ namespace ALDExplorer
 
             /*
              * Get palette from raw data
-             *   pal: palette to be stored 
+             *   pal: palette to be stored
              *   b  : raw data (pointer to palette)
             */
             internal static void GetPalette(Palette palette, PmsHeader pmsHeader, byte[] bytes)
@@ -993,11 +1023,12 @@ namespace ALDExplorer
                     length = dest.Length - destIndex;
                 }
                 Array.Copy(src, srcIndex, dest, destIndex, length);
-
-                //for (int i = 0; i < length; i++)
-                //{
-                //    dest[destIndex + i] = src[srcIndex + i];
-                //}
+                /*
+                for (int i = 0; i < length; i++)
+                {
+                   dest[destIndex + i] = src[srcIndex + i];
+                }
+                */
             }
 
             static void memset(byte[] bytes, int index, byte value, int count)
@@ -1440,16 +1471,18 @@ namespace ALDExplorer
 
             internal static void SaveImageData16Bit(Stream stream, ushort[] pic, int width, int height)
             {
-                //<F7 = raw byte
-                //FF: length = b+2, from previous scanline
-                //FE: length = b+2, from two scanlines ago
-                //FD: length = b+3, RLE run
-                //FC: length = (b+2)*2, alternating RLE run
-                //FB: one from previous scanline - 1
-                //FA: one from previous scanline + 1
-                //F9: length = b+1, 3 high bits for B, 2 high bits for G, 3 high bits for R,
-                //                  read 2 low bits for B, 4 low bits for G, 3 low bits for R
-                //F8: literal
+                /*
+                <F7 = raw byte
+                FF: length = b+2, from previous scanline
+                FE: length = b+2, from two scanlines ago
+                FD: length = b+3, RLE run
+                FC: length = (b+2)*2, alternating RLE run
+                FB: one from previous scanline - 1
+                FA: one from previous scanline + 1
+                F9: length = b+1, 3 high bits for B, 2 high bits for G, 3 high bits for R,
+                                 read 2 low bits for B, 4 low bits for G, 3 low bits for R
+                F8: literal
+                */
 
                 int[] sizes = new int[4];
 
@@ -1531,13 +1564,14 @@ namespace ALDExplorer
                 BinaryWriter bw = new BinaryWriter(stream);
 
                 ////JUNK PASS: all literals
-                //for (i = 0; i < pic.Length; i++)
-                //{
-                //    bw.Write((byte)0xF8);
-                //    bw.Write((ushort)pic[i]);
-                //}
-                //return;
-
+                /*
+                for (i = 0; i < pic.Length; i++)
+                {
+                   bw.Write((byte)0xF8);
+                   bw.Write((ushort)pic[i]);
+                }
+                return;
+                */
 
                 //pass #2
                 ms.Position = 0;
@@ -1918,7 +1952,7 @@ namespace ALDExplorer
 
             /*
              * Get palette from raw data
-             *   pal: palette to be stored 
+             *   pal: palette to be stored
              *   b  : raw data (pointer to palette)
             */
             public static void GetPalette(Palette palette, byte[] bytes, VspHeader vspHeader)
@@ -2451,8 +2485,7 @@ namespace ALDExplorer
 
             public static QntHeader GetQntHeader(byte[] bytes)
             {
-                var ms = new MemoryStream(bytes);
-                return GetQntHeader(ms);
+                return GetQntHeader(new MemoryStream(bytes));
             }
 
             public static QntHeader GetQntHeader(Stream ms)
@@ -2720,29 +2753,29 @@ namespace ALDExplorer
             {
                 int i, j, x, y;
                 j = 0;
-                //if (pic.Length > raw.Length)
-                //{
-                //    int numberOfChannels = raw.Length / (pic.Length / 3);
-                //    if (numberOfChannels == 1)
-                //    {
-                //        //this only happens on a corrupt file - non interleaved copy of the alpha channel
-                //        for (y = 0; y < h; y++)
-                //        {
-                //            for (x = 0; x < w; x++)
-                //            {
-                //                i = x + y * w;
-                //                pic[i * 3] = raw[i];
-                //                pic[i * 3 + 1] = raw[i];
-                //                pic[i * 3 + 2] = raw[i];
-                //            }
-                //        }
-                //        return;
-                //    }
-                //    else
-                //    {
-
-                //    }
-                //}
+                /*
+                if (pic.Length > raw.Length)
+                {
+                   int numberOfChannels = raw.Length / (pic.Length / 3);
+                   if (numberOfChannels == 1)
+                   {
+                       //this only happens on a corrupt file - non interleaved copy of the alpha channel
+                       for (y = 0; y < h; y++)
+                       {
+                           for (x = 0; x < w; x++)
+                           {
+                               i = x + y * w;
+                               pic[i * 3] = raw[i];
+                               pic[i * 3 + 1] = raw[i];
+                               pic[i * 3 + 2] = raw[i];
+                           }
+                       }
+                       return;
+                   }
+                   else
+                   {}
+                }
+                */
 
                 for (i = 3 - 1; i >= 0; i--)
                 {
@@ -2904,15 +2937,15 @@ namespace ALDExplorer
                         {
                             raw[j] = pic2[(y * w + x) * 3 + i];
                             raw[j + 1] = pic2[((y + 1) * w + x) * 3 + i];
-                            //raw[j + 2] = pic2[(y * w + x + 1) * 3 + i];
-                            //if (((y + 1) * w + x + 1) * 3 + i < pic2.Length)
-                            //{
-                            //    raw[j + 3] = pic2[((y + 1) * w + x + 1) * 3 + i];
-                            //}
-                            //else
-                            //{
-
-                            //}
+                            /*
+                            raw[j + 2] = pic2[(y * w + x + 1) * 3 + i];
+                            if (((y + 1) * w + x + 1) * 3 + i < pic2.Length)
+                            {
+                               raw[j + 3] = pic2[((y + 1) * w + x + 1) * 3 + i];
+                            }
+                            else
+                            {}
+                            */
                             j += 4;
                         }
                     }
@@ -3225,24 +3258,25 @@ namespace ALDExplorer
                 }
 
                 return jpegImage;
+                /*
+                int pmsSize = ajpHeader.sizeOfDataAfterJpeg - 16;
+                if (pmsSize < 0)
+                {
+                   return jpegImage;
+                }
+                var pmsData = br.ReadBytes(pmsSize);
 
-                //int pmsSize = ajpHeader.sizeOfDataAfterJpeg - 16;
-                //if (pmsSize < 0)
-                //{
-                //    return jpegImage;
-                //}
-                //var pmsData = br.ReadBytes(pmsSize);
-
-                //var newPmsFileStream = new MemoryStream();
-                //var newPmsHeader = new byte[] { 0x50, 0x4D, 0x02, 0x00, 0x40, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
-                //var bw2 = new BinaryWriter(newPmsFileStream);
-                //bw2.Write(newPmsHeader);
-                //bw2.Write(pmsData);
-                //FreeImageBitmap pmsImage = Pms.LoadImage(newPmsFileStream.ToArray());
-                //jpegImage.ConvertColorDepth(FREE_IMAGE_COLOR_DEPTH.FICD_32_BPP);
-                //jpegImage.SetChannel(pmsImage, FREE_IMAGE_COLOR_CHANNEL.FICC_ALPHA);
-                //pmsImage.Dispose();
-                //return jpegImage;
+                var newPmsFileStream = new MemoryStream();
+                var newPmsHeader = new byte[] { 0x50, 0x4D, 0x02, 0x00, 0x40, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+                var bw2 = new BinaryWriter(newPmsFileStream);
+                bw2.Write(newPmsHeader);
+                bw2.Write(pmsData);
+                FreeImageBitmap pmsImage = Pms.LoadImage(newPmsFileStream.ToArray());
+                jpegImage.ConvertColorDepth(FREE_IMAGE_COLOR_DEPTH.FICD_32_BPP);
+                jpegImage.SetChannel(pmsImage, FREE_IMAGE_COLOR_CHANNEL.FICC_ALPHA);
+                pmsImage.Dispose();
+                return jpegImage;
+                */
             }
 
             private static void LoadImage(Stream ajpStream, out MemoryStream jpegFile, out MemoryStream pmsFile, out AjpHeader ajpHeader)
@@ -3456,69 +3490,69 @@ namespace ALDExplorer
                 AjpHeader ajpHeader = ajpHeaderFromBitmap;
                 if (ajpHeader == null) ajpHeader = ajpHeaderFromComment;
                 SaveImage(stream, ms.ToArray(), ms2.ToArray(), ajpHeader);
+                /*
+                if (ajpHeader == null)
+                {
+                   ajpHeader = new AjpHeader();
+                }
 
 
-                //if (ajpHeader == null)
-                //{
-                //    ajpHeader = new AjpHeader();
-                //}
 
+                if (ajpHeader.signature == 0)
+                {
+                   ajpHeader.signature = 0x00504a41;
+                }
+                if (ajpHeader.headerSize1 == 0)
+                {
+                   ajpHeader.headerSize1 = 0x38;
+                }
+                if (ajpHeader.headerSize2 == 0)
+                {
+                   ajpHeader.headerSize2 = 0x38;
+                }
+                if (ajpHeader.unknown1 == null || ajpHeader.unknown1.Length == 0)
+                {
+                   ajpHeader.unknown1 = GetBytes("1FDBC2B6037BC601E1FF1AA7FB7AC601");
+                }
+                if (ajpHeader.unknown3 == null || ajpHeader.unknown1.Length == 0)
+                {
+                   ajpHeader.unknown3 = GetBytes("A24951674A460B8BCAAA4C93B7CA167C");
+                }
+                if (ajpHeader.jpegFooter == null || ajpHeader.jpegFooter.Length == 0)
+                {
+                   ajpHeader.jpegFooter = GetBytes("0DDCAC870A5649CD83EC4C92B5CB1634");
+                }
 
+                ajpHeader.width = bitmap.Width;
+                ajpHeader.height = bitmap.Height;
+                ajpHeader.jpegDataLength = (int)ms.Length + 0;
 
-                //if (ajpHeader.signature == 0)
-                //{
-                //    ajpHeader.signature = 0x00504a41;
-                //}
-                //if (ajpHeader.headerSize1 == 0)
-                //{
-                //    ajpHeader.headerSize1 = 0x38;
-                //}
-                //if (ajpHeader.headerSize2 == 0)
-                //{
-                //    ajpHeader.headerSize2 = 0x38;
-                //}
-                //if (ajpHeader.unknown1 == null || ajpHeader.unknown1.Length == 0)
-                //{
-                //    ajpHeader.unknown1 = GetBytes("1FDBC2B6037BC601E1FF1AA7FB7AC601");
-                //}
-                //if (ajpHeader.unknown3 == null || ajpHeader.unknown1.Length == 0)
-                //{
-                //    ajpHeader.unknown3 = GetBytes("A24951674A460B8BCAAA4C93B7CA167C");
-                //}
-                //if (ajpHeader.jpegFooter == null || ajpHeader.jpegFooter.Length == 0)
-                //{
-                //    ajpHeader.jpegFooter = GetBytes("0DDCAC870A5649CD83EC4C92B5CB1634");
-                //}
+                bool hasAlpha = ms2.Length != 0;
 
-                //ajpHeader.width = bitmap.Width;
-                //ajpHeader.height = bitmap.Height;
-                //ajpHeader.jpegDataLength = (int)ms.Length + 0;
+                if (!hasAlpha)
+                {
+                   ajpHeader.alphaLocation = 0;
+                   ajpHeader.sizeOfDataAfterJpeg = 0;
+                }
+                else
+                {
+                   // TOFIX
+                   ajpHeader.sizeOfDataAfterJpeg = (int)ms2.Length - 16 + 16;
+                   ajpHeader.alphaLocation = ajpHeader.jpegDataLength + ajpHeader.headerSize1;
+                }
 
-                //bool hasAlpha = ms2.Length != 0;
+                WriteAjpHeader(stream, ajpHeader);
 
-                //if (!hasAlpha)
-                //{
-                //    ajpHeader.alphaLocation = 0;
-                //    ajpHeader.sizeOfDataAfterJpeg = 0;
-                //}
-                //else
-                //{
-                //    //fixme
-                //    ajpHeader.sizeOfDataAfterJpeg = (int)ms2.Length - 16 + 16;
-                //    ajpHeader.alphaLocation = ajpHeader.jpegDataLength + ajpHeader.headerSize1;
-                //}
+                ms.Position = 16;
+                stream.WriteFromStream(ms);
+                var bw = new BinaryWriter(stream);
+                bw.Write(ajpHeader.jpegFooter);
 
-                //WriteAjpHeader(stream, ajpHeader);
+                ms2.Position = 16;
+                stream.WriteFromStream(ms2);
 
-                //ms.Position = 16;
-                //stream.WriteFromStream(ms);
-                //var bw = new BinaryWriter(stream);
-                //bw.Write(ajpHeader.jpegFooter);
-
-                //ms2.Position = 16;
-                //stream.WriteFromStream(ms2);
-
-                //throw new NotImplementedException();
+                throw new NotImplementedException();
+                */
             }
 
             private static void WriteAjpHeader(Stream stream, AjpHeader ajp)
