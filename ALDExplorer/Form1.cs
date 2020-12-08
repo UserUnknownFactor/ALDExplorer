@@ -2559,7 +2559,7 @@ namespace ALDExplorer
         {
             using (var openFileDialog = new OpenFileDialog())
             {
-                openFileDialog.Filter = "PNG Images (*.PNG)|*.png|All Files (*.*)|*.*";
+                openFileDialog.Filter = "PNG Image (*.PNG)|*.png|All Files (*.*)|*.*";
                 if (openFileDialog.ShowDialog() == DialogResult.OK)
                 {
                     ConvertFile(openFileDialog.FileName, extension);
@@ -2586,7 +2586,7 @@ namespace ALDExplorer
         {
             using (var openFileDialog = new OpenFileDialog())
             {
-                openFileDialog.Filter = "PNG Images (*.PNS,*.QNT,*.AJP)|*.ajp;*.qnt;*.pns;*.jpeg|All Files (*.*)|*.*";
+                openFileDialog.Filter = "AliceSoft Image (*.PNS,*.QNT,*.AJP)|*.ajp;*.qnt;*.pns;*.jpeg|All Files (*.*)|*.*";
                 if (openFileDialog.ShowDialog() == DialogResult.OK)
                 {
                     var ext = Path.GetExtension(openFileDialog.FileName);
