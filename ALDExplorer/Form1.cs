@@ -11,6 +11,7 @@ using FreeImageAPI;
 using System.Diagnostics;
 using WMPLib;
 //using DDW.Swf;
+using ALDExplorer.Formats;
 
 namespace ALDExplorer
 {
@@ -45,6 +46,58 @@ namespace ALDExplorer
         private void openToolStripMenuItem_Click(object sender, EventArgs e)
         {
             OpenFile();
+        }
+
+        private void ConvertFile(string fileName, string to)
+        {
+            try
+            {
+                using (var bitmap = GetImage(fileName))
+                using (var fs = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                {
+                    var outName = Path.GetDirectoryName(fileName) + Path.DirectorySeparatorChar + Path.GetFileNameWithoutExtension(fileName) + to;
+                    switch (to)
+                    {
+                        case ".png":
+                            bitmap.Save(outName, FREE_IMAGE_FORMAT.FIF_PNG);
+                            Debug.Print("written to: " + outName);
+                            bitmap.Dispose();
+                            break;
+                        case ".ajp":
+                            using (var ms = new FileStream(outName, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
+                                ImageConverter.SaveAjp(ms, bitmap);
+                            Debug.Print("written to: " + outName);
+                            bitmap.Dispose();
+                            break;
+                        case ".vsp":
+                            using (var ms = new FileStream(outName, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
+                                ImageConverter.SaveVsp(ms, bitmap);
+                            Debug.Print("written to: " + outName);
+                            bitmap.Dispose();
+                            break;
+                        case ".pms":
+                            using (var ms = new FileStream(outName, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
+                                ImageConverter.SavePms(ms, bitmap);
+                            Debug.Print("written to: " + outName);
+                            bitmap.Dispose();
+                            break;
+                        case ".qnt":
+                            using (var ms = new FileStream(outName, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
+                                ImageConverter.SaveQnt(ms, bitmap);
+                            Debug.Print("written to: " + outName);
+                            bitmap.Dispose();
+                            break;
+                    }
+                }
+            }
+            catch (InvalidDataException)
+            {
+                MessageBox.Show(this, "The loaded file is not a valid " + 
+                    Path.GetExtension(fileName).Substring(1).ToUpper() + 
+                    " file", "ALDExplorer", MessageBoxButtons.OK, MessageBoxIcon.Stop);
+            }
+
+            LoadTreeView(false);
         }
 
         private void OpenFile()
@@ -259,7 +312,7 @@ namespace ALDExplorer
             }
             else if (ext == ".dcf" || ext == ".pcf")
             {
-                imageIndex = 4;
+                imageIndex = 2;
             }
             else if (ext == ".sco")
             {
@@ -1344,6 +1397,17 @@ namespace ALDExplorer
             //    }
             //}
             return bitmap;
+        }
+
+        public static FreeImageBitmap GetImage(string fileName)
+        {
+            using (var fs = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            {
+                long fsLength = fs.Length;
+                var br = new BinaryReader(fs);
+                var fileBytes = br.ReadBytes((int)fsLength);
+                return GetImage(fileBytes, Path.GetExtension(fileName));
+            }
         }
 
         public static FreeImageBitmap GetImage(byte[] fileBytes)
@@ -2491,6 +2555,47 @@ namespace ALDExplorer
 
         }
 
+        private void cmenuPNG2_internal(string extension)
+        {
+            using (var openFileDialog = new OpenFileDialog())
+            {
+                openFileDialog.Filter = "PNG Images (*.PNG)|*.png|All Files (*.*)|*.*";
+                if (openFileDialog.ShowDialog() == DialogResult.OK)
+                {
+                    ConvertFile(openFileDialog.FileName, extension);
+                }
+            }
+        }
+
+        private void cmenuPNG2AJP_Click(object sender, EventArgs e)
+        {
+            cmenuPNG2_internal(".ajp");
+        }
+
+        private void cmenuPNG2QNT_Click(object sender, EventArgs e)
+        {
+            cmenuPNG2_internal(".qnt");
+        }
+
+        private void cmenuPNG2PNS_Click(object sender, EventArgs e)
+        {
+            cmenuPNG2_internal(".pns");
+        }
+
+        private void cmenuANY2PNG_Click(object sender, EventArgs e)
+        {
+            using (var openFileDialog = new OpenFileDialog())
+            {
+                openFileDialog.Filter = "PNG Images (*.PNS,*.QNT,*.AJP)|*.ajp;*.qnt;*.pns;*.jpeg|All Files (*.*)|*.*";
+                if (openFileDialog.ShowDialog() == DialogResult.OK)
+                {
+                    var ext = Path.GetExtension(openFileDialog.FileName);
+                    var extBIG = ext.Substring(1).ToUpper();
+                    if (extBIG != "AJP" && extBIG != "PNS" && extBIG != "QNT" && extBIG != "JPG" && extBIG != "JPEG") return;
+                    ConvertFile(openFileDialog.FileName, ".png");
+                }
+            }
+        }
     }
 
     public static class ListViewItemExtensions

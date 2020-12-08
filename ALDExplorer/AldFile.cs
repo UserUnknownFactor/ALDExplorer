@@ -9,6 +9,7 @@ using System.Drawing;
 using System.Windows.Forms;
 using ZLibNet;
 using System.Diagnostics;
+using ALDExplorer.Formats;
 
 namespace ALDExplorer
 {
@@ -1277,7 +1278,7 @@ namespace ALDExplorer
                 {
                     fs.Position = oldPosition;
                 }
-                return null;
+                //return null;
             }
 
             public static AldFileEntry[] GetAfaFileEntries(FileStream fs, ref int ver)
@@ -1451,7 +1452,7 @@ namespace ALDExplorer
                 {
                     List<AldFileEntry> list = new List<AldFileEntry>();
                     var br = new BinaryReader(fs);
-                    int index = 0;
+                    //int index = 0;
 
                     while (fs.Position < fs.Length)
                     {
@@ -2810,6 +2811,19 @@ namespace ALDExplorer
                         converted = true;
                     }
                 }
+                if (extension == ".dcf" || extension == ".pcf")
+                {
+                    var qntHeader = GetOriginalImageHeaderXCF();
+                    using (FreeImageBitmap imageFile = new FreeImageBitmap(this.ReplacementFileName))
+                    {
+                        if (qntHeader != null)
+                        {
+                            imageFile.Comment = qntHeader.GetComment();
+                        }
+                        ImageConverter.SaveQnt(stream, imageFile);
+                        converted = true;
+                    }
+                }
                 if (extension == ".ajp")
                 {
                     var ajpHeader = GetOriginalImageHeaderAJP();
@@ -2928,6 +2942,11 @@ namespace ALDExplorer
         private QntHeader GetOriginalImageHeaderQNT()
         {
             return CallFunctionOnFile((fs) => ImageConverter.LoadQntHeader(fs));
+        }
+
+        private XcfHeader GetOriginalImageHeaderXCF()
+        {
+            return CallFunctionOnFile((fs) => ImageConverter.LoadXcfHeader(fs));
         }
 
         private AjpHeader GetOriginalImageHeaderAJP()
