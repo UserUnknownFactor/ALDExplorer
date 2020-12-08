@@ -1,0 +1,40 @@
+name: Release the App
+
+on:
+  push:
+    # Sequence of patterns matched against refs/tags
+    tags:
+    - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v1
+      name: Checkout Code
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v1
+      
+    - name: Install dependencies
+      run: dotnet restore
+
+    - name: Build
+      run: msbuild ALDExplorer.sln /p:Configuration=Release
+
+    - name: Get the versioned name
+      id: get_version
+      run: echo ::set-output name=VERSION::ALDExplorer_${GITHUB_REF/refs\/tags\//}.zip 
+      shell: bash
+
+    - name: Pack release
+      run: Compress-Archive -Path ALDExplorer/bin/x86/Release/net40/* -DestinationPath ${{ steps.get_version.outputs.VERSION }} -CompressionLevel Optimal
+
+    - name: Upload binaries to release
+      uses: svenstaro/upload-release-action@v2
+      with:
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        tag: ${{ github.ref }}
+        file: ${{ steps.get_version.outputs.VERSION }}
+        overwrite: true
