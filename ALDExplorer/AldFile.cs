@@ -2830,14 +2830,16 @@ namespace ALDExplorer
                 }
                 if (extension == ".dcf" || extension == ".pcf")
                 {
-                    var qntHeader = GetOriginalImageHeaderXCF();
+                    var xcfHeader = GetOriginalImageHeaderXCF();
+
+                    if (xcfHeader.tags != null)
                     using (FreeImageBitmap imageFile = new FreeImageBitmap(this.ReplacementFileName))
                     {
-                        if (qntHeader != null)
+                        if (xcfHeader != null)
                         {
-                            imageFile.Comment = qntHeader.GetComment();
+                            imageFile.Comment = xcfHeader.GetComment();
                         }
-                        ImageConverter.SaveQnt(stream, imageFile);
+                        ImageConverter.SaveXcf(stream, xcfHeader, imageFile);
                         converted = true;
                     }
                 }

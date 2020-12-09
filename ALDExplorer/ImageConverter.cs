@@ -294,20 +294,41 @@ namespace ALDExplorer
 
         public static XcfHeader LoadXcfHeader(Stream s)
         {
-            var br1 = new BinaryReader(s);
-            var header = new XcfHeader();
-            List<Tag> tags = new List<Tag>();
-            while (br1.BaseStream.Position < br1.BaseStream.Length)
-            {
-                var _tag = (new Tag()).ReadTag(br1);
-                tags.Add(_tag);
+            using (var br = new BinaryReader(s)) { 
+                var header = new XcfHeader();
+                List<Tag> tags = new List<Tag>();
+                while (br.BaseStream.Position < br.BaseStream.Length)
+                {
+                    var tag = (new Tag()).ReadTag(br);
+                    if (tag.TagName.Length > 0)
+                        tags.Add(tag);
+                    if (tag.TagName == "pcgd" || tag.TagName == "dcgd") break;
+                }
+                header.tags = tags;
+                return header;
             }
-            return header;
         }
 
-        public static void SaveXcf(Stream s, FreeImageBitmap bitmap)
+        public static void SaveXcf(Stream s, XcfHeader header, FreeImageBitmap bitmap)
         {
-            Qnt.SaveImage(s, bitmap);
+            var bw = new BinaryWriter(s);
+            foreach (Tag tag in header.tags)
+            {
+                if (tag.TagName == "pcgd" || tag.TagName == "dcgd")
+                {
+                    using (var s1 = new MemoryStream())
+                    using (var br = new BinaryReader(s1))
+                    {
+                        SaveQnt(s1, bitmap);
+                        s1.Position = 0;
+                        tag.TagData = s1.ToArray();
+                        tag.WriteTag(bw);
+                    }
+                        
+                }
+                else
+                    tag.WriteTag(bw);
+            }
         }
 
         public static QntHeader LoadQntHeader(Stream stream)

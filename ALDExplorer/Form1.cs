@@ -61,31 +61,26 @@ namespace ALDExplorer
                         case ".png":
                             bitmap.Save(outName, FREE_IMAGE_FORMAT.FIF_PNG);
                             Debug.Print("written to: " + outName);
-                            bitmap.Dispose();
                             break;
                         case ".ajp":
                             using (var ms = new FileStream(outName, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
                                 ImageConverter.SaveAjp(ms, bitmap);
                             Debug.Print("written to: " + outName);
-                            bitmap.Dispose();
                             break;
                         case ".vsp":
                             using (var ms = new FileStream(outName, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
                                 ImageConverter.SaveVsp(ms, bitmap);
                             Debug.Print("written to: " + outName);
-                            bitmap.Dispose();
                             break;
                         case ".pms":
                             using (var ms = new FileStream(outName, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
                                 ImageConverter.SavePms(ms, bitmap);
                             Debug.Print("written to: " + outName);
-                            bitmap.Dispose();
                             break;
                         case ".qnt":
                             using (var ms = new FileStream(outName, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
                                 ImageConverter.SaveQnt(ms, bitmap);
                             Debug.Print("written to: " + outName);
-                            bitmap.Dispose();
                             break;
                     }
                 }
@@ -354,31 +349,30 @@ namespace ALDExplorer
                         if (Debugger.IsAttached && bitmap != null)
                         {
                             //long originalSize = entry.FileSize;
-                            var ms = new MemoryStream();
-                            switch (extension)
-                            {
-                                case ".ajp":
-                                    ImageConverter.SaveAjp(ms, bitmap);
-                                    bitmap.Dispose();
-                                    bitmap = ImageConverter.LoadAjp(ms.ToArray());
-                                    break;
-                                case ".vsp":
-                                    ImageConverter.SaveVsp(ms, bitmap);
-                                    bitmap.Dispose();
-                                    bitmap = ImageConverter.LoadVsp(ms.ToArray());
-                                    break;
-                                case ".pms":
-                                    ImageConverter.SavePms(ms, bitmap);
-                                    bitmap.Dispose();
-                                    bitmap = ImageConverter.LoadPms(ms.ToArray());
-                                    break;
-                                case ".qnt":
-                                    ImageConverter.SaveQnt(ms, bitmap);
-                                    bitmap.Dispose();
-                                    bitmap = ImageConverter.LoadQnt(ms.ToArray());
-                                    break;
-                            }
-                            ms.Dispose();
+                            using (var ms = new MemoryStream())
+                                switch (extension)
+                                {
+                                    case ".ajp":
+                                        ImageConverter.SaveAjp(ms, bitmap);
+                                        bitmap.Dispose();
+                                        bitmap = ImageConverter.LoadAjp(ms.ToArray());
+                                        break;
+                                    case ".vsp":
+                                        ImageConverter.SaveVsp(ms, bitmap);
+                                        bitmap.Dispose();
+                                        bitmap = ImageConverter.LoadVsp(ms.ToArray());
+                                        break;
+                                    case ".pms":
+                                        ImageConverter.SavePms(ms, bitmap);
+                                        bitmap.Dispose();
+                                        bitmap = ImageConverter.LoadPms(ms.ToArray());
+                                        break;
+                                    case ".qnt":
+                                        ImageConverter.SaveQnt(ms, bitmap);
+                                        bitmap.Dispose();
+                                        bitmap = ImageConverter.LoadQnt(ms.ToArray());
+                                        break;
+                                }
                         }
 #pragma warning restore CS0162 // Unreachable code detected
                     }

@@ -83,17 +83,15 @@ namespace ALDExplorer.Formats
         {
             var qntHeader = GetQntHeader(bytes);
             if (qntHeader == null || !qntHeader.Validate())
-            {
                 return null;
-            }
+
             var pixels = GetQntPixels(bytes, qntHeader);
             byte[] alphaPixels = null;
             if (qntHeader.alphaSize != 0)
-            {
                 alphaPixels = GetQntAlpha(bytes, qntHeader);
-            }
 
-            FreeImageBitmap image = new FreeImageBitmap(qntHeader.width, qntHeader.height, qntHeader.width * 3, 24, FREE_IMAGE_TYPE.FIT_BITMAP, pixels);
+            FreeImageBitmap image = new FreeImageBitmap(qntHeader.width, qntHeader.height, qntHeader.width * 3, 24, 
+                FREE_IMAGE_TYPE.FIT_BITMAP, pixels);
             using (var blue = image.GetChannel(FREE_IMAGE_COLOR_CHANNEL.FICC_RED))
             using (var red = image.GetChannel(FREE_IMAGE_COLOR_CHANNEL.FICC_BLUE)) {
                 if (alphaPixels != null)
@@ -109,14 +107,11 @@ namespace ALDExplorer.Formats
             try
             {
                 if (alphaPixels != null)
-                {
-                    alpha = new FreeImageBitmap(qntHeader.width, qntHeader.height, qntHeader.width, 8, FREE_IMAGE_TYPE.FIT_BITMAP, alphaPixels);
-                }
+                    alpha = new FreeImageBitmap(qntHeader.width, qntHeader.height, qntHeader.width, 8,
+                        FREE_IMAGE_TYPE.FIT_BITMAP, alphaPixels);
 
                 if (alpha != null)
-                {
                     image.SetChannel(alpha, FREE_IMAGE_COLOR_CHANNEL.FICC_ALPHA);
-                }
             }
             finally
             {
@@ -149,9 +144,8 @@ namespace ALDExplorer.Formats
             }
 
             if (qnt.headerSize > 1024 * 1024 || qnt.headerSize < 0)
-            {
                 return null;
-            }
+
             qnt.xLocation = br.ReadInt32();
             qnt.yLocation = br.ReadInt32();
             qnt.width = br.ReadInt32();
@@ -164,13 +158,10 @@ namespace ALDExplorer.Formats
             long endPosition = ms.Position - startPosition;
             int extraDataLength = qnt.headerSize - (int)endPosition;
             if (extraDataLength < 0 || extraDataLength > 1024 * 1024)
-            {
                 return null;
-            }
             if (extraDataLength > 0)
-            {
                 qnt.extraData = br.ReadBytes(extraDataLength);
-            }
+
             return qnt;
         }
 
