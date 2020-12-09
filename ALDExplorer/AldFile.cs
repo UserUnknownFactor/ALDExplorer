@@ -639,7 +639,7 @@ namespace ALDExplorer
                 long[] fileSizes;
                 using (var fs = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                 {
-                    BinaryReader br = new BinaryReader(fs);
+                    var br = new BinaryReader(fs);
                     fileAddresses = AldUtil.GetAlkFileAddresses(fs);
                     fileSizes = AldUtil.GetAlkFileSizes(fs);
 
@@ -655,8 +655,8 @@ namespace ALDExplorer
 
                         fs.Position = fileEntry.FileAddress;
                         var filePeek = br.ReadBytes(16);
-                        var ms = new MemoryStream(filePeek);
-                        var br2 = new BinaryReader(ms);
+                        using (var ms = new MemoryStream(filePeek))
+                        using(var br2 = new BinaryReader(ms))
                         do
                         {
                             ms.Position = 0;
@@ -716,6 +716,8 @@ namespace ALDExplorer
                         fileEntry.Index = i;
                         FileEntries.Add(fileEntry);
                     }
+
+                    br.Dispose();
                 }
             }
             else if (fileType == AldFileType.AFA1File || fileType == AldFileType.AFA2File || fileType == AldFileType.AFA3File)
@@ -1333,7 +1335,7 @@ namespace ALDExplorer
 
                     if (version != 1 || unknown3 != 1)
                     {
-                        Debug.WriteLine("version & unknown3 usually 1, don't really care though");
+                        //Debug.WriteLine("version & unknown3 usually 1, don't really care though");
                     }
                     if (dataBase + 8 > fileLength)
                     {
@@ -1471,67 +1473,67 @@ namespace ALDExplorer
                 try
                 {
                     List<AldFileEntry> list = new List<AldFileEntry>();
-                    var ms = new MemoryStream(decompressedToc);
-                    var br = new BinaryReader(ms);
                     int index = 0;
-                    while (ms.Position < ms.Length)
-                    {
-                        int fileNameLength = br.ReadInt32();
-                        int fileNameLengthPadded = br.ReadInt32();
-                        if (fileNameLength <= 0 || fileNameLength > 512)
+                    using (var ms = new MemoryStream(decompressedToc))
+                    using (var br = new BinaryReader(ms))
+                        while (ms.Position < ms.Length)
                         {
-                            return null;
-                        }
-                        if (fileNameLengthPadded <= 0 || fileNameLengthPadded > 512)
-                        {
-                            return null;
-                        }
-                        if (fileNameLength > fileNameLengthPadded)
-                        {
-                            return null;
-                        }
-                        var fileNameBytes = br.ReadBytes(fileNameLengthPadded);
+                            int fileNameLength = br.ReadInt32();
+                            int fileNameLengthPadded = br.ReadInt32();
+                            if (fileNameLength <= 0 || fileNameLength > 512)
+                            {
+                                return null;
+                            }
+                            if (fileNameLengthPadded <= 0 || fileNameLengthPadded > 512)
+                            {
+                                return null;
+                            }
+                            if (fileNameLength > fileNameLengthPadded)
+                            {
+                                return null;
+                            }
+                            var fileNameBytes = br.ReadBytes(fileNameLengthPadded);
 
-                        if (fileNameBytes.Take(fileNameLength).AnyEqualTo((byte)0))
-                        {
-                            Debug.WriteLine("file name bytes contains nulls, invalid filename");
-                            return null;
+                            if (fileNameBytes.Take(fileNameLength).AnyEqualTo((byte)0))
+                            {
+                                Debug.WriteLine("file name bytes contains nulls, invalid filename");
+                                return null;
+                            }
+                            string fileName = shiftJisWithThrow.GetString(fileNameBytes, 0, fileNameLength);
+                            int unknown1, unknown2, unknown3 = 0;
+                            long offset, length;
+
+                            unknown1 = br.ReadInt32();
+                            unknown2 = br.ReadInt32();
+                            if (ver == 1)
+                            {
+                                unknown3 = br.ReadInt32();
+                            }
+
+                            offset = br.ReadUInt32();
+                            length = br.ReadUInt32();
+
+                            if (offset + dataBase + length > fileSize)
+                            {
+                                return null;
+                            }
+
+                            AldFileEntry entry = new AldFileEntry();
+                            entry.FileAddress = offset + dataBase;
+                            entry.FileSize = length;
+                            entry.FileName = fileName;
+                            entry.Index = index;
+                            entry.FileNumber = -1;
+                            entry.FileHeader = null;
+                            entry.FileLetter = 0;
+                            entry.HeaderAddress = -1;
+                            entry.ReplacementFileName = null;
+                            entry.ReplacementBytes = null;
+                            entry.Parent = null;
+
+                            list.Add(entry);
+                            index++;
                         }
-                        string fileName = shiftJisWithThrow.GetString(fileNameBytes, 0, fileNameLength);
-                        int unknown1, unknown2, unknown3 = 0;
-                        long offset, length;
-
-                        unknown1 = br.ReadInt32();
-                        unknown2 = br.ReadInt32();
-                        if (ver == 1)
-                        {
-                            unknown3 = br.ReadInt32();
-                        }
-
-                        offset = br.ReadUInt32();
-                        length = br.ReadUInt32();
-
-                        if (offset + dataBase + length > fileSize)
-                        {
-                            return null;
-                        }
-
-                        AldFileEntry entry = new AldFileEntry();
-                        entry.FileAddress = offset + dataBase;
-                        entry.FileSize = length;
-                        entry.FileName = fileName;
-                        entry.Index = index;
-                        entry.FileNumber = -1;
-                        entry.FileHeader = null;
-                        entry.FileLetter = 0;
-                        entry.HeaderAddress = -1;
-                        entry.ReplacementFileName = null;
-                        entry.ReplacementBytes = null;
-                        entry.Parent = null;
-
-                        list.Add(entry);
-                        index++;
-                    }
                     if (list.Count != entryCount)
                     {
                         return null;
@@ -1619,65 +1621,73 @@ namespace ALDExplorer
 
             private static byte[] CreateAfaToc(IList<AldFileEntry> aldFiles, long dataBase, bool isVersion2)
             {
-                MemoryStream ms = new MemoryStream();
-                BinaryWriter bw = new BinaryWriter(ms);
-
-                foreach (var entry in aldFiles)
-                {
-                    byte[] fileNameBytes = shiftJis.GetBytes(entry.FileName);
-                    int fileNameLengthPadded = (fileNameBytes.Length) | 3 + 1;
-
-                    bw.Write((int)fileNameBytes.Length);
-                    bw.Write((int)(fileNameLengthPadded));
-                    bw.Write(fileNameBytes);
-                    int paddingByteCount = fileNameLengthPadded - fileNameBytes.Length;
-                    for (int i = 0; i < paddingByteCount; i++)
+                using (var ms = new MemoryStream())
+                using (var bw = new BinaryWriter(ms))
+                { 
+                    foreach (var entry in aldFiles)
                     {
-                        bw.Write((byte)0);
+                        byte[] fileNameBytes = shiftJis.GetBytes(entry.FileName);
+                        int fileNameLengthPadded = (fileNameBytes.Length) | 3 + 1;
+
+                        bw.Write((int)fileNameBytes.Length);
+                        bw.Write((int)(fileNameLengthPadded));
+                        bw.Write(fileNameBytes);
+                        int paddingByteCount = fileNameLengthPadded - fileNameBytes.Length;
+                        for (int i = 0; i < paddingByteCount; i++)
+                        {
+                            bw.Write((byte)0);
+                        }
+                        bw.Write((int)0x2d99e180); //unknown1  0x2d99e180
+                        bw.Write((int)0x01cf5475); //unknown2  0x01cf5475
+                        if (!isVersion2)
+                        {
+                            bw.Write((int)0); //unknown3
+                        }
+                        bw.Write((uint)(entry.FileAddress - dataBase));
+                        bw.Write((uint)(entry.FileSize));
                     }
-                    bw.Write((int)0x2d99e180); //unknown1  0x2d99e180
-                    bw.Write((int)0x01cf5475); //unknown2  0x01cf5475
-                    if (!isVersion2)
-                    {
-                        bw.Write((int)0); //unknown3
-                    }
-                    bw.Write((uint)(entry.FileAddress - dataBase));
-                    bw.Write((uint)(entry.FileSize));
+                    return ms.ToArray();
                 }
-                return ms.ToArray();
             }
 
             private static byte[] Decompress(byte[] compressedData, int decompressedLength)
             {
-                var ms = new MemoryStream(compressedData);
-                var zlibStream = new ZLibStream(ms, CompressionMode.Decompress);
-                try
+                using (var ms = new MemoryStream(compressedData))
+                using (var zlibStream = new ZLibStream(ms, CompressionMode.Decompress)) 
                 {
-                    var br = new BinaryReader(zlibStream);
-                    var bytes = br.ReadBytes(decompressedLength);
-                    return bytes;
-                }
-                catch
-                {
-                    return null;
+                    try
+                    {
+                        using (var br = new BinaryReader(zlibStream))
+                        {
+                            var bytes = br.ReadBytes(decompressedLength);
+                            return bytes;
+                        }
+                            
+                    }
+                    catch
+                    {
+                        return null;
+                    }
                 }
             }
 
             private static byte[] Compress(byte[] uncompressedData)
             {
-                var ms = new MemoryStream();
-                var zlibStream = new ZLibStream(ms, CompressionMode.Compress, CompressionLevel.Level9);
-                try
+                using (var ms = new MemoryStream())
+                using (var zlibStream = new ZLibStream(ms, CompressionMode.Compress, CompressionLevel.Level9))
+                using (var bw = new BinaryWriter(zlibStream))
                 {
-                    var bw = new BinaryWriter(zlibStream);
-                    bw.Write(uncompressedData);
-                    zlibStream.Flush();
-                    zlibStream.Close();
-                    return ms.ToArray();
-                }
-                catch
-                {
-                    return null;
+                    try
+                    {
+                        bw.Write(uncompressedData);
+                        zlibStream.Flush();
+                        zlibStream.Close();
+                        return ms.ToArray();
+                    }
+                    catch
+                    {
+                        return null;
+                    }
                 }
             }
 
@@ -2302,18 +2312,19 @@ namespace ALDExplorer
             if (this.Footer == null)
             {
                 this.Footer = new byte[16];
-                var ms = new MemoryStream(this.Footer);
-                var bw = new BinaryWriter(ms);
-
-                bw.Write((byte)'N');
-                bw.Write((byte)'L');
-                bw.Write((byte)0x01);
-                bw.Write((byte)0x00);
-                bw.Write((int)0x10);
+                using (var ms = new MemoryStream(this.Footer))
+                using (var bw = new BinaryWriter(ms)) 
+                { 
+                    bw.Write((byte)'N');
+                    bw.Write((byte)'L');
+                    bw.Write((byte)0x01);
+                    bw.Write((byte)0x00);
+                    bw.Write((int)0x10);
+                }
             }
-            {
-                var ms = new MemoryStream(this.Footer);
-                var bw = new BinaryWriter(ms);
+            using (var ms = new MemoryStream(this.Footer))
+            using (var bw = new BinaryWriter(ms))
+            { 
                 ms.Position = 8;
                 bw.Write((byte)0x01);
                 bw.Write((short)this.FileEntries.Count);
@@ -2482,9 +2493,10 @@ namespace ALDExplorer
 
         public byte[] GetFileData(bool doNotConvert)
         {
-            var ms = new MemoryStream();
-            WriteDataToStream(ms, doNotConvert);
-            return ms.ToArray();
+            using (var ms = new MemoryStream()) { 
+                WriteDataToStream(ms, doNotConvert);
+                return ms.ToArray();
+            }
         }
 
         public object Tag
@@ -2517,37 +2529,39 @@ namespace ALDExplorer
                 if (headerSize == 16) headerSize = 32;
 
                 FileHeader = new byte[headerSize];
-                var ms = new MemoryStream(FileHeader);
-                var bw = new BinaryWriter(ms);
-                bw.Write((int)headerSize);
-                bw.Write((int)0);
-                bw.Write((uint)0x8E5C4430); //???
-                bw.Write((int)0x01C9F639); //???
-                bw.Write((int)0);
-                bw.Write((int)0);
-                bw.Write((int)0);
-                bw.Write((int)0);
+                using (var ms = new MemoryStream(FileHeader))
+                using (var bw = new BinaryWriter(ms)) { 
+                    bw.Write((int)headerSize);
+                    bw.Write((int)0);
+                    bw.Write((uint)0x8E5C4430); //???
+                    bw.Write((int)0x01C9F639); //???
+                    bw.Write((int)0);
+                    bw.Write((int)0);
+                    bw.Write((int)0);
+                    bw.Write((int)0);
+                }
             }
 
             {
-                var ms = new MemoryStream(FileHeader);
-                var bw = new BinaryWriter(ms);
-
-                byte[] fileNameBytes = shiftJis.GetBytes(this.FileName);
-                ms.Position = 4;
-                bw.Write((int)this.FileSize);
-                ms.Position = 16;
-                int maxFileNameLength = FileHeader.Length - 16;
-
-                if (fileNameBytes.Length < maxFileNameLength)
+                using (var ms = new MemoryStream(FileHeader))
+                using (var bw = new BinaryWriter(ms))
                 {
-                    fileNameBytes = fileNameBytes.Concat(Enumerable.Repeat((byte)0, maxFileNameLength - fileNameBytes.Length)).ToArray();
+                    byte[] fileNameBytes = shiftJis.GetBytes(this.FileName);
+                    ms.Position = 4;
+                    bw.Write((int)this.FileSize);
+                    ms.Position = 16;
+                    int maxFileNameLength = FileHeader.Length - 16;
+
+                    if (fileNameBytes.Length < maxFileNameLength)
+                    {
+                        fileNameBytes = fileNameBytes.Concat(Enumerable.Repeat((byte)0, maxFileNameLength - fileNameBytes.Length)).ToArray();
+                    }
+                    else if (fileNameBytes.Length > maxFileNameLength)
+                    {
+                        fileNameBytes = fileNameBytes.Take(maxFileNameLength).ToArray();
+                    }
+                    bw.Write(fileNameBytes);
                 }
-                else if (fileNameBytes.Length > maxFileNameLength)
-                {
-                    fileNameBytes = fileNameBytes.Take(maxFileNameLength).ToArray();
-                }
-                bw.Write(fileNameBytes);
             }
         }
 
@@ -2585,8 +2599,7 @@ namespace ALDExplorer
                 }
 
                 byte[] containerBytes;
-                {
-                    var msContainer = new MemoryStream();
+                using (var msContainer = new MemoryStream()) { 
                     WriteDataToStream2(msContainer, doNotConvert);
                     containerBytes = msContainer.ToArray();
                 }
@@ -2610,12 +2623,14 @@ namespace ALDExplorer
                     var oldNode = subImage.Tag as Node;
                     if (oldNode != null)
                     {
-                        var ms = new MemoryStream();
-                        subImage.WriteDataToStream(ms);
-                        var newBytes = ms.ToArray();
-                        var newNode = oldNode.Clone();
-                        newNode.Bytes = newBytes;
-                        nodes.Add(newNode);
+                        using (var ms = new MemoryStream())
+                        { 
+                            subImage.WriteDataToStream(ms);
+                            var newBytes = ms.ToArray();
+                            var newNode = oldNode.Clone();
+                            newNode.Bytes = newBytes;
+                            nodes.Add(newNode);
+                        }
                     }
                 }
                 var subImageFinder = new SubImageFinder(this);
@@ -2678,11 +2693,13 @@ namespace ALDExplorer
                         else
                         {
                             var parent = node.Parent;
-                            var ms = new MemoryStream();
-                            parent.WriteDataToStream(ms, doNotConvert);
-                            ms.Position = this.FileAddress;
-                            ms.WriteToStream(stream, FileSize);
-                        }
+                            using (var ms = new MemoryStream())
+                            {
+                                parent.WriteDataToStream(ms, doNotConvert);
+                                ms.Position = this.FileAddress;
+                                ms.WriteToStream(stream, FileSize);
+                            }
+                    }
                     }
                 }
             }
@@ -3435,44 +3452,6 @@ namespace ALDExplorer
 
             static Encoding shiftJis = Encoding.GetEncoding("shift-jis");
 
-            public Node[] GetSubImageNodesXCF(byte[] bytes)
-            {
-                List<Node> list = new List<Node>();
-                var ms1 = new MemoryStream(bytes);
-                var br1 = new BinaryReader(ms1);
-
-                while (br1.BaseStream.Position < br1.BaseStream.Length)
-                {
-                    long offset1 = br1.BaseStream.Position;
-                    var tag = (new Tag()).ReadTag(br1);
-                    if (tag.TagName == "pcgd" || tag.TagName == "dcgd")
-                    {
-                        var dataBytes = tag.TagData;
-                        var ms = new MemoryStream(dataBytes);
-                        var br = new BinaryReader(ms);
-
-                        int imageLength = br.ReadInt32();
-                        int filTag = br.ReadInt32();
-                        byte[] imageBytes;
-                        long offset2 = br.BaseStream.Position + offset1 + 8;
-                        if (filTag == 0x00544E51) //QNT
-                        {
-                            br.BaseStream.Position -= 4;
-                            offset2 -= 4;
-                            imageBytes = br.ReadBytes(imageLength);
-                        }
-                        else
-                        {
-                            imageBytes = br.ReadBytes(imageLength - 4);
-                        }
-
-                        list.Add(new Node() { Bytes = imageBytes, FileName = (this.entry.FileName + ".qnt"), Offset = offset2, Parent = this.entry });
-                        br.BaseStream.Position = ((br.BaseStream.Position - 1) | 3) + 1;
-                    }
-                }
-                return list.ToArray();
-            }
-
             public Node[] GetSubImageNodesFlat(byte[] bytes)
             {
                 List<Node> list = new List<Node>();
@@ -3514,8 +3493,12 @@ namespace ALDExplorer
                             list.Add(new Node() { Bytes = imageBytes, FileName = fileName, Offset = offset2, Parent = this.entry });
                             br.BaseStream.Position = ((br.BaseStream.Position - 1) | 3) + 1;
                         }
+                        ms.Dispose();
+                        br.Dispose();
                     }
                 }
+                ms1.Dispose();
+                br1.Dispose();
                 return list.ToArray();
             }
 
@@ -3607,6 +3590,8 @@ namespace ALDExplorer
                         int tagLength = (int)(lastPos - (tagLengthPos + 4));
                         bw.Write((int)tagLength);
                         bw.BaseStream.Position = lastPos;
+                        ms.Dispose();
+                        br.Dispose();
                     }
                     else
                     {
@@ -3614,7 +3599,16 @@ namespace ALDExplorer
                     }
 
                 }
-                return msOutput.ToArray();
+
+                ms1.Dispose();
+                br1.Dispose();
+
+                var ret = msOutput.ToArray();
+
+                bw.Dispose();
+                msOutput.Dispose();
+
+                return ret;
             }
 
 
@@ -3957,7 +3951,7 @@ namespace ALDExplorer
                 m_string_buf = new byte[input_length];
             for (int i = 0; i < input_length; ++i)
             {
-                if (input[i] > m_dict.Length) continue;
+                Debug.Assert(input[i] > m_dict.Length, $"Index is out of range {input[i]} > {m_dict.Length}");
                 m_string_buf[i] = (byte)(m_dict[input[i]] ^ 0xA4);
             }
             return Encoding.GetEncoding(932).GetString(m_string_buf, 0, input_length);

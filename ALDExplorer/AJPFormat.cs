@@ -139,10 +139,13 @@ namespace ALDExplorer.Formats
 
             LoadImage(ajpStream, out jpegFile, out pmsFile, out ajpHeader);
             jpegBytes = jpegFile.ToArray();
+            jpegFile.Dispose();
+
             alpha = null;
             if (pmsFile != null)
             {
                 FreeImageBitmap pmsImage = Pms.LoadImage(pmsFile.ToArray());
+                pmsFile.Dispose();
                 alpha = pmsImage;
             }
         }

@@ -94,14 +94,16 @@ namespace ALDExplorer.Formats
             }
 
             FreeImageBitmap image = new FreeImageBitmap(qntHeader.width, qntHeader.height, qntHeader.width * 3, 24, FREE_IMAGE_TYPE.FIT_BITMAP, pixels);
-            var blue = image.GetChannel(FREE_IMAGE_COLOR_CHANNEL.FICC_RED);
-            var red = image.GetChannel(FREE_IMAGE_COLOR_CHANNEL.FICC_BLUE);
-            if (alphaPixels != null)
-            {
-                image.ConvertColorDepth(FREE_IMAGE_COLOR_DEPTH.FICD_32_BPP);
+            using (var blue = image.GetChannel(FREE_IMAGE_COLOR_CHANNEL.FICC_RED))
+            using (var red = image.GetChannel(FREE_IMAGE_COLOR_CHANNEL.FICC_BLUE)) {
+                if (alphaPixels != null)
+                {
+                    image.ConvertColorDepth(FREE_IMAGE_COLOR_DEPTH.FICD_32_BPP);
+                }
+                image.SetChannel(blue, FREE_IMAGE_COLOR_CHANNEL.FICC_BLUE);
+                image.SetChannel(red, FREE_IMAGE_COLOR_CHANNEL.FICC_RED);
             }
-            image.SetChannel(blue, FREE_IMAGE_COLOR_CHANNEL.FICC_BLUE);
-            image.SetChannel(red, FREE_IMAGE_COLOR_CHANNEL.FICC_RED);
+
 
             FreeImageBitmap alpha = null;
             try
@@ -229,21 +231,23 @@ namespace ALDExplorer.Formats
             byte[] pic;
             if (qntHeader.pixelSize > 0)
             {
-                var ms = new MemoryStream(inputBytes, qntHeader.headerSize, qntHeader.pixelSize);
-                //ms.Position = qntHeader.headerSize;
+                byte[] raw = null;
+                using (var ms = new MemoryStream(inputBytes, qntHeader.headerSize, qntHeader.pixelSize))
+                {
+                    using (var rawMs = ZLibCompressor.DeCompress(ms)) { 
+                        raw = rawMs.ToArray();
+                    }
 
-                var rawMs = ZLibCompressor.DeCompress(ms);
-                var raw = rawMs.ToArray();
-                int endPosition = (int)ms.Position;
-                //int length = (int)ms.Position - qntHeader.headerSize;
-                //if (length != qntHeader.pixelSize + qntHeader.alphaSize)
-                //{
-
-                //}
+                    int endPosition = (int)ms.Position;
+                    //int length = (int)ms.Position - qntHeader.headerSize;
+                    //if (length != qntHeader.pixelSize + qntHeader.alphaSize)
+                    //{
+                    //}
+                }
 
                 int w = qntHeader.width;
                 int h = qntHeader.height;
-                if (raw.Length < w * h * 3)
+                if (raw != null && raw.Length < w * h * 3)
                 {
                     throw new InvalidDataException("Size of decompressed data is wrong");
                 }
@@ -288,6 +292,8 @@ namespace ALDExplorer.Formats
 
         private static byte[] DecodeQntPixels(byte[] raw, int w, int h)
         {
+            if (raw == null) return null;
+
             byte[] pic = new byte[h * w * 3];
             if (raw.Length < pic.Length)
             {
@@ -457,11 +463,14 @@ namespace ALDExplorer.Formats
 
         static byte[] GetQntAlpha(byte[] inputBytes, QntHeader qntHeader)
         {
-            var ms = new MemoryStream(inputBytes);
-            ms.Position = qntHeader.headerSize + qntHeader.pixelSize;
-
-            var rawMs = ZLibCompressor.DeCompress(ms);
-            var raw = rawMs.ToArray();
+            byte[] raw = null;
+            using (var ms = new MemoryStream(inputBytes)) { 
+                ms.Position = qntHeader.headerSize + qntHeader.pixelSize;
+                using (var rawMs = ZLibCompressor.DeCompress(ms))
+                { 
+                    raw = rawMs.ToArray();
+                }
+            }
 
             int w = qntHeader.width;
             int h = qntHeader.height;
@@ -503,6 +512,7 @@ namespace ALDExplorer.Formats
 
         private static byte[] DecodeQntAlpha(byte[] raw, int w, int h)
         {
+            if (raw == null) return null;
             byte[] pic = new byte[w * h];
             int i = 1;
             int x, y;
@@ -607,9 +617,11 @@ namespace ALDExplorer.Formats
                 }
             }
 
-            MemoryStream ms = new MemoryStream(raw);
-            var br = new BinaryReader(ms);
-            return br.ReadBytes(j);
+            using (var ms = new MemoryStream(raw))
+            using (var br = new BinaryReader(ms))
+            {
+                return br.ReadBytes(j);
+            }
 
             //return raw;
         }

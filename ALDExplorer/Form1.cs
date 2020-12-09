@@ -350,6 +350,7 @@ namespace ALDExplorer
                 {
                     if (false)
                     {
+#pragma warning disable CS0162 // Unreachable code detected
                         if (Debugger.IsAttached && bitmap != null)
                         {
                             //long originalSize = entry.FileSize;
@@ -377,7 +378,9 @@ namespace ALDExplorer
                                     bitmap = ImageConverter.LoadQnt(ms.ToArray());
                                     break;
                             }
+                            ms.Dispose();
                         }
+#pragma warning restore CS0162 // Unreachable code detected
                     }
 
                     if (extension == ".mid" || extension == ".mp3" || extension == ".ogg" || extension == ".wav")
@@ -970,12 +973,12 @@ namespace ALDExplorer
                     var saveFileDialog = new SaveFileDialog();
                     saveFileDialog.OverwritePrompt = false;
                     fileDialog = saveFileDialog;
-                    fileDialog.FileName = "SELECT DIRECTORY TO EXPORT FILES TO";
+                    fileDialog.FileName = "SELECT TARGET DIRECTORY";
                 }
                 else
                 {
                     fileDialog = new OpenFileDialog();
-                    fileDialog.FileName = "SELECT DIRECTORY TO IMPORT FILES FROM";
+                    fileDialog.FileName = "SELECT SOURCE DIRECTORY";
                 }
                 fileDialog.CheckFileExists = false;
                 fileDialog.CheckPathExists = true;
@@ -1126,11 +1129,11 @@ namespace ALDExplorer
                 bitmap = GetBitmapFromFile(entry);
             }
 
+            string outputFileName;
+            string desiredExt = GetDesiredExtension(extension, bitmap);
+
             try
             {
-                string outputFileName;
-                string desiredExt = GetDesiredExtension(extension, bitmap);
-
                 if (outputPath == null)
                 {
                     outputFileName = PromptForOutputFileName(fileName, extension, bitmap);
@@ -1144,7 +1147,15 @@ namespace ALDExplorer
                     outputFileName = Path.Combine(outputPath, Path.ChangeExtension(fileName, desiredExt));
                 }
 
-                ExportFileWithName(entry, outputFileName, bitmap);
+                if (!File.Exists(outputFileName))
+                {
+                    if (bitmap == null && Debugger.IsAttached)
+                    {
+                        Debug.Print("No Image Conversion:" + outputFileName);
+                        //Debugger.Break();
+                    }
+                    ExportFileWithName(entry, outputFileName, bitmap);
+                }
 
                 //if (bitmap != null)
                 //{
@@ -1307,6 +1318,8 @@ namespace ALDExplorer
                         }
                     }
                 }
+
+                fileBytes = null;
             }
 
             //if (extension == ".vsp")
@@ -1418,35 +1431,39 @@ namespace ALDExplorer
         public static FreeImageBitmap GetImage(byte[] fileBytes, string extension)
         {
             FreeImageBitmap bitmap = null;
-            var fileStream = new MemoryStream(fileBytes);
-            //&& extension == ".vsp"
+            using (var fileStream = new MemoryStream(fileBytes)) 
+            {
+                //&& extension == ".vsp"
 
-            //first try just the loader for the matching file extension
-            if (bitmap == null && extension == ".qnt") { try { bitmap = ImageConverter.LoadQnt(fileBytes); } catch { } }
-            if (bitmap == null && extension == ".dcf") { bitmap = ImageConverter.LoadXcf(fileBytes);  }
-            if (bitmap == null && extension == ".pcf") { bitmap = ImageConverter.LoadXcf(fileBytes); }
-            if (bitmap == null && extension == ".png") { try { bitmap = new FreeImageBitmap(fileStream, FREE_IMAGE_FORMAT.FIF_PNG); } catch { } }
-            if (bitmap == null && extension == ".pms") { try { bitmap = ImageConverter.LoadPms(fileBytes); } catch { } }
-            if (bitmap == null && extension == ".ajp") { try { bitmap = ImageConverter.LoadAjp(fileBytes); } catch { } }
-            if (bitmap == null && (extension == ".jpg" || extension == ".jpeg")) { try { bitmap = new FreeImageBitmap(fileStream, FREE_IMAGE_FORMAT.FIF_JPEG); } catch { } }
-            if (bitmap == null && extension == ".vsp") { try { bitmap = ImageConverter.LoadVsp(fileBytes); } catch { } }
-            if (bitmap == null && extension == ".bmp") { try { bitmap = new FreeImageBitmap(fileStream, FREE_IMAGE_FORMAT.FIF_BMP); } catch { } }
+                //first try just the loader for the matching file extension
+                if (bitmap == null && extension == ".qnt") { try { bitmap = ImageConverter.LoadQnt(fileBytes); } catch { } }
+                if (bitmap == null && extension == ".dcf") { bitmap = ImageConverter.LoadXcf(fileBytes); }
+                if (bitmap == null && extension == ".pcf") { bitmap = ImageConverter.LoadXcf(fileBytes); }
+                if (bitmap == null && extension == ".png") { try { bitmap = new FreeImageBitmap(fileStream, FREE_IMAGE_FORMAT.FIF_PNG); } catch { } }
+                if (bitmap == null && extension == ".pms") { try { bitmap = ImageConverter.LoadPms(fileBytes); } catch { } }
+                if (bitmap == null && extension == ".ajp") { try { bitmap = ImageConverter.LoadAjp(fileBytes); } catch { } }
+                if (bitmap == null && (extension == ".jpg" || extension == ".jpeg")) { try { bitmap = new FreeImageBitmap(fileStream, FREE_IMAGE_FORMAT.FIF_JPEG); } catch { } }
+                if (bitmap == null && extension == ".vsp") { try { bitmap = ImageConverter.LoadVsp(fileBytes); } catch { } }
+                if (bitmap == null && extension == ".bmp") { try { bitmap = new FreeImageBitmap(fileStream, FREE_IMAGE_FORMAT.FIF_BMP); } catch { } }
 
-            //if it fails, try them all
-            if (bitmap == null) { try { bitmap = ImageConverter.LoadQnt(fileBytes); } catch { } }
-            if (bitmap == null) { try { bitmap = new FreeImageBitmap(fileStream, FREE_IMAGE_FORMAT.FIF_PNG); } catch { } }
-            if (bitmap == null) { try { bitmap = ImageConverter.LoadPms(fileBytes); } catch { } }
-            if (bitmap == null) { try { bitmap = ImageConverter.LoadAjp(fileBytes); } catch { } }
-            if (bitmap == null) { try { bitmap = new FreeImageBitmap(fileStream, FREE_IMAGE_FORMAT.FIF_JPEG); } catch { } }
-            if (bitmap == null) { try { bitmap = ImageConverter.LoadVsp(fileBytes); } catch { } }
-            if (bitmap == null) { try { bitmap = new FreeImageBitmap(fileStream, FREE_IMAGE_FORMAT.FIF_BMP); } catch { } }
-            if (bitmap == null) { try { bitmap = new FreeImageBitmap(fileStream); } catch { } }
-            //if (bitmap == null) { try { bitmap = LoadSwfBitmap(fileBytes); } catch (Exception ex) { } }
+                //if it fails, try them all
+                if (bitmap == null) { try { bitmap = ImageConverter.LoadQnt(fileBytes); } catch { } }
+                if (bitmap == null) { try { bitmap = new FreeImageBitmap(fileStream, FREE_IMAGE_FORMAT.FIF_PNG); } catch { } }
+                if (bitmap == null) { try { bitmap = ImageConverter.LoadPms(fileBytes); } catch { } }
+                if (bitmap == null) { try { bitmap = ImageConverter.LoadAjp(fileBytes); } catch { } }
+                if (bitmap == null) { try { bitmap = new FreeImageBitmap(fileStream, FREE_IMAGE_FORMAT.FIF_JPEG); } catch { } }
+                if (bitmap == null) { try { bitmap = ImageConverter.LoadVsp(fileBytes); } catch { } }
+                if (bitmap == null) { try { bitmap = new FreeImageBitmap(fileStream, FREE_IMAGE_FORMAT.FIF_BMP); } catch { } }
+                if (bitmap == null) { try { bitmap = new FreeImageBitmap(fileStream); } catch { } }
+                //if (bitmap == null) { try { bitmap = LoadSwfBitmap(fileBytes); } catch (Exception ex) { } }
+            }
 
             if (bitmap == null && Debugger.IsAttached)
             {
-                Debugger.Break();
+                //Debug.Print("");
+                //Debugger.Break();
             }
+
             return bitmap;
         }
 
@@ -2059,34 +2076,37 @@ namespace ALDExplorer
         private string[] GetFileStrings(AldFileEntry fileEntry, string[] ainStrings)
         {
             var bytes = fileEntry.GetFileData();
-            var ms = new MemoryStream(bytes);
-            var br = new BinaryReader(ms);
             List<string> list = new List<string>();
             int position = -1;
-            while (true)
-            {
-                position = bytes.IndexOf("/", position + 1);
-                if (position == -1)
+
+            using (var ms = new MemoryStream(bytes))
+            using (var br = new BinaryReader(ms))
+            { 
+                while (true)
                 {
-                    break;
-                }
-                if (position + 5 < bytes.Length)
-                {
-                    if (bytes[position + 1] >= 0x7C && bytes[position + 1] <= 0x7F)
+                    position = bytes.IndexOf("/", position + 1);
+                    if (position == -1)
                     {
-                        ms.Position = position + 2;
-                        int stringIndex = br.ReadInt32();
-                        if (stringIndex >= 0 && stringIndex < ainStrings.Length)
+                        break;
+                    }
+                    if (position + 5 < bytes.Length)
+                    {
+                        if (bytes[position + 1] >= 0x7C && bytes[position + 1] <= 0x7F)
                         {
-                            string str = ainStrings[stringIndex];
-                            list.Add(str);
-                            position = (int)ms.Position - 1;
+                            ms.Position = position + 2;
+                            int stringIndex = br.ReadInt32();
+                            if (stringIndex >= 0 && stringIndex < ainStrings.Length)
+                            {
+                                string str = ainStrings[stringIndex];
+                                list.Add(str);
+                                position = (int)ms.Position - 1;
+                            }
                         }
                     }
-                }
-                else
-                {
-                    break;
+                    else
+                    {
+                        break;
+                    }
                 }
             }
             return list.ToArray();
@@ -2100,33 +2120,34 @@ namespace ALDExplorer
                 int b = bytes[i];
                 bytes[i] = (byte)((b >> 6) | b << 2);
             }
-            var ms = new MemoryStream(bytes);
-            var br = new BinaryReader(ms);
-            ms.Position = 4;
-            int number4 = br.ReadInt32();
-            string hel0 = br.ReadStringFixedSize(4);
-            if (hel0 != "HEL0")
-            {
-                return null;
+            using (var ms = new MemoryStream(bytes))
+            using (var br = new BinaryReader(ms))
+            { 
+                ms.Position = 4;
+                int number4 = br.ReadInt32();
+                string hel0 = br.ReadStringFixedSize(4);
+                if (hel0 != "HEL0")
+                {
+                    return null;
+                }
+
+                int addressOfFunc = bytes.IndexOf("FUNC\0\0\0\0", (int)ms.Position);
+                if (addressOfFunc == -1) return null;
+                int addressOfVari = bytes.IndexOf("VARI\0\0\0\0", addressOfFunc + 8);
+                if (addressOfVari == -1) return null;
+                int addressOfMsgi = bytes.IndexOf("MSGI\0\0\0\0", addressOfVari + 8);
+                if (addressOfMsgi == -1) return null;
+
+                ms.Position = addressOfMsgi + 8;
+                int numberOfStrings = br.ReadInt32();
+                List<string> list = new List<string>(numberOfStrings);
+                for (int i = 0; i < numberOfStrings; i++)
+                {
+                    string str = br.ReadStringNullTerminated();
+                    list.Add(str);
+                }
+                return list.ToArray();
             }
-
-            int addressOfFunc = bytes.IndexOf("FUNC\0\0\0\0", (int)ms.Position);
-            if (addressOfFunc == -1) return null;
-            int addressOfVari = bytes.IndexOf("VARI\0\0\0\0", addressOfFunc + 8);
-            if (addressOfVari == -1) return null;
-            int addressOfMsgi = bytes.IndexOf("MSGI\0\0\0\0", addressOfVari + 8);
-            if (addressOfMsgi == -1) return null;
-
-            ms.Position = addressOfMsgi + 8;
-            int numberOfStrings = br.ReadInt32();
-            List<string> list = new List<string>(numberOfStrings);
-            for (int i = 0; i < numberOfStrings; i++)
-            {
-                string str = br.ReadStringNullTerminated();
-                list.Add(str);
-            }
-
-            return list.ToArray();
         }
 
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)

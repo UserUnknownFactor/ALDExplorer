@@ -236,14 +236,16 @@ namespace ALDExplorer
 
         public static byte[] SkipXcfHeader(byte[] bytes)
         {
-            var ms1 = new MemoryStream(bytes);
-            var br1 = new BinaryReader(ms1);
-            while (br1.BaseStream.Position < br1.BaseStream.Length)
+            using (var ms1 = new MemoryStream(bytes))
+            using (var br1 = new BinaryReader(ms1))
             {
-                var tag = (new Tag()).ReadTag(br1);
-                if (tag == null) break;
-                if (tag.TagName == "pcgd" || tag.TagName == "dcgd")
-                    return tag.TagData;
+                while (br1.BaseStream.Position < br1.BaseStream.Length)
+                {
+                    var tag = (new Tag()).ReadTag(br1);
+                    if (tag == null) break;
+                    if (tag.TagName == "pcgd" || tag.TagName == "dcgd")
+                        return tag.TagData;
+                }
             }
             //br1.BaseStream.Position = ((br1.BaseStream.Position - 1) | 3) + 1;
             return null;
@@ -646,9 +648,10 @@ namespace ALDExplorer
 
         public static byte[] ConvertSwfToAff(byte[] swfBytes)
         {
-            MemoryStream ms = new MemoryStream();
-            ConvertSwfToAff(swfBytes, ms);
-            return ms.ToArray();
+            using (var ms = new MemoryStream()) { 
+                ConvertSwfToAff(swfBytes, ms);
+                return ms.ToArray();
+            }
         }
 
         public static void ConvertSwfToAff(byte[] swfBytes, Stream outputStream)
