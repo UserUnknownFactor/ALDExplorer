@@ -27,5 +27,5 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-artifact@v2
       with:
-        name: ALDExplorer
+        name: ALDExplorer.zip
         path: ALDExplorer/bin/x86/Release/net40/*

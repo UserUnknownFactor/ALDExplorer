@@ -2,14 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.IO;
+//using System.IO.Compression;
 using System.Text;
 using System.Collections.ObjectModel;
 using FreeImageAPI;
-using System.Drawing;
-using System.Windows.Forms;
-using ZLibNet;
+//using System.Drawing;
+//using System.Windows.Forms;
 using System.Diagnostics;
 using ALDExplorer.Formats;
+using ZLibNet;
 
 namespace ALDExplorer
 {
@@ -3381,15 +3382,13 @@ namespace ALDExplorer
 
             public Node[] GetSubImageNodes()
             {
-                var bytes = entry.GetFileData();
-
-                return GetSubImageNodes(bytes);
+                return GetSubImageNodes(entry.GetFileData());
             }
 
             public Node[] GetSubImageNodes(byte[] bytes)
             {
                 string sig = ASCIIEncoding.ASCII.GetString(bytes, 0, 3);
-                if (sig == "FLA")
+                if (sig == "FLA" || sig == "ELN")
                 {
                     return GetSubImageNodesFlat(bytes);
                 }
@@ -3456,161 +3455,13 @@ namespace ALDExplorer
 
             public Node[] GetSubImageNodesFlat(byte[] bytes)
             {
-                List<Node> list = new List<Node>();
-                var ms1 = new MemoryStream(bytes);
-                var br1 = new BinaryReader(ms1);
-
-                while (br1.BaseStream.Position < br1.BaseStream.Length)
-                {
-                    long offset1 = br1.BaseStream.Position;
-                    var tag = (new Tag()).ReadTag(br1);
-                    if (tag.TagName == "LIBL")
-                    {
-                        var dataBytes = tag.TagData;
-                        var ms = new MemoryStream(dataBytes);
-                        var br = new BinaryReader(ms);
-                        int fileCount = br.ReadInt32(); //9
-                        for (int fileNumber = 0; fileNumber < fileCount; fileNumber++)
-                        {
-                            int fileNameLength = br.ReadInt32(); //8
-                            var fileNameBytes = br.ReadBytes(fileNameLength);
-                            string fileName = shiftJis.GetString(fileNameBytes);
-                            br.BaseStream.Position = ((br.BaseStream.Position - 1) | 3) + 1;
-                            int unknown1 = br.ReadInt32();  //
-                            int dataLength = br.ReadInt32();
-                            int unknown2 = br.ReadInt32();
-                            byte[] imageBytes; ;
-                            long offset2 = br.BaseStream.Position + offset1 + 8;
-                            if (unknown2 == 0x00544E51) //QNT
-                            {
-                                br.BaseStream.Position -= 4;
-                                offset2 -= 4;
-                                imageBytes = br.ReadBytes(dataLength);
-                            }
-                            else
-                            {
-                                imageBytes = br.ReadBytes(dataLength - 4);
-                            }
-
-                            list.Add(new Node() { Bytes = imageBytes, FileName = fileName, Offset = offset2, Parent = this.entry });
-                            br.BaseStream.Position = ((br.BaseStream.Position - 1) | 3) + 1;
-                        }
-                        ms.Dispose();
-                        br.Dispose();
-                    }
-                }
-                ms1.Dispose();
-                br1.Dispose();
-                return list.ToArray();
+                return FLAT.GetNodes(bytes, this.entry);
+                    
             }
 
             public byte[] ReplaceSubImageNodesFlat(byte[] bytes, Node[] nodes)
             {
-                var ms1 = new MemoryStream(bytes);
-                var br1 = new BinaryReader(ms1);
-
-                var msOutput = new MemoryStream();
-                var bw = new BinaryWriter(msOutput);
-
-                while (br1.BaseStream.Position < br1.BaseStream.Length)
-                {
-                    var tag = (new Tag()).ReadTag(br1);
-                    if (tag.TagName == "LIBL")
-                    {
-                        bw.WriteStringFixedSize("LIBL", 4);
-                        long tagLengthPos = bw.BaseStream.Position;
-                        bw.Write((int)0);
-
-                        var dataBytes = tag.TagData;
-                        var ms = new MemoryStream(dataBytes);
-                        var br = new BinaryReader(ms);
-                        int fileCount = br.ReadInt32();
-                        bw.Write((int)fileCount);
-                        for (int fileNumber = 0; fileNumber < fileCount; fileNumber++)
-                        {
-                            int fileNameLength = br.ReadInt32();
-                            var fileNameBytes = br.ReadBytes(fileNameLength);
-                            string fileName = shiftJis.GetString(fileNameBytes);
-                            long lastPosition = br.BaseStream.Position;
-                            br.BaseStream.Position = ((br.BaseStream.Position - 1) | 3) + 1;
-                            int paddingCount1 = (int)(br.BaseStream.Position - lastPosition);
-
-                            int unknown1 = br.ReadInt32();
-                            int dataLength = br.ReadInt32();
-                            int unknown2 = br.ReadInt32();
-                            byte[] imageBytes;
-                            if (unknown2 == 0x00544E51) //QNT
-                            {
-                                br.BaseStream.Position -= 4;
-                                imageBytes = br.ReadBytes(dataLength);
-                            }
-                            else
-                            {
-                                imageBytes = br.ReadBytes(dataLength - 4);
-                            }
-                            lastPosition = br.BaseStream.Position;
-                            br.BaseStream.Position = ((br.BaseStream.Position - 1) | 3) + 1;
-                            int paddingCount2 = (int)(br.BaseStream.Position - lastPosition);
-
-                            var node = nodes[fileNumber];
-                            //write replacement node
-                            var newFileNameBytes = shiftJis.GetBytes(node.FileName);
-
-                            long outputPosition = bw.BaseStream.Position;
-
-                            bw.Write((int)newFileNameBytes.Length);
-                            bw.Write(newFileNameBytes);
-
-                            int outputPadding1 = (int)(((((bw.BaseStream.Position - outputPosition) - 1) | 3) + 1) - (bw.BaseStream.Position - outputPosition));
-                            for (int i = 0; i < outputPadding1; i++)
-                            {
-                                bw.Write((byte)0);
-                            }
-
-                            bw.Write((int)unknown1);
-                            if (unknown2 != 0x00544E51)
-                            {
-                                bw.Write((int)node.Bytes.Length + 4);
-                                bw.Write((int)unknown2);
-                            }
-                            else
-                            {
-                                bw.Write((int)node.Bytes.Length);
-                            }
-                            bw.Write(node.Bytes);
-
-                            int outputPadding2 = (int)(((((bw.BaseStream.Position - outputPosition) - 1) | 3) + 1) - (bw.BaseStream.Position - outputPosition));
-
-                            for (int i = 0; i < outputPadding2; i++)
-                            {
-                                bw.Write((byte)0);
-                            }
-                        }
-
-                        long lastPos = bw.BaseStream.Position;
-                        bw.BaseStream.Position = tagLengthPos;
-                        int tagLength = (int)(lastPos - (tagLengthPos + 4));
-                        bw.Write((int)tagLength);
-                        bw.BaseStream.Position = lastPos;
-                        ms.Dispose();
-                        br.Dispose();
-                    }
-                    else
-                    {
-                        tag.WriteTag(bw);
-                    }
-
-                }
-
-                ms1.Dispose();
-                br1.Dispose();
-
-                var ret = msOutput.ToArray();
-
-                bw.Dispose();
-                msOutput.Dispose();
-
-                return ret;
+                return FLAT.ReplaceNodes(ref bytes, ref nodes);
             }
 
 
@@ -3947,16 +3798,18 @@ namespace ALDExplorer
 
         byte[] m_string_buf = new byte[0x100];
 
+        static Encoding shiftJis = Encoding.GetEncoding("shift-jis");
+
         string DecryptString(ushort[] input, int input_length)
         {
             if (m_string_buf.Length < input_length)
                 m_string_buf = new byte[input_length];
             for (int i = 0; i < input_length; ++i)
             {
-                Debug.Assert(input[i] > m_dict.Length, $"Index is out of range {input[i]} > {m_dict.Length}");
+                Debug.Assert(input[i] > m_dict.Length, $"{i}-th index is out of range {input[i]} > {m_dict.Length}");
                 m_string_buf[i] = (byte)(m_dict[input[i]] ^ 0xA4);
             }
-            return Encoding.GetEncoding(932).GetString(m_string_buf, 0, input_length);
+            return shiftJis.GetString(m_string_buf, 0, input_length);
         }
 
         static int ReadInt32(MsbBitStream input)
@@ -4031,4 +3884,29 @@ namespace ALDExplorer
             }
         }
     }
+
+    /*
+    static class AFF
+    {
+        static readonly byte[] AffKey = {
+            0xC8, 0xBB, 0x8F, 0xB7, 0xED, 0x43, 0x99, 0x4A,
+            0xA2, 0x7E, 0x5B, 0xB0, 0x68, 0x18, 0xF8, 0x88
+        };
+
+        static public Stream OpenEntry(ref AldFile arc, ref AldFileEntry entry)
+        {
+            if (entry.Size <= 0x10 || !arc.File.View.AsciiEqual(entry.Offset, "AFF\0"))
+                return base.OpenEntry(arc, entry);
+            uint data_size = entry.Size - 0x10u;
+            uint encrypted_length = Math.Min(0x40u, data_size);
+            var prefix = arc.File.View.ReadBytes(entry.Offset + 0x10, encrypted_length);
+            for (int i = 0; i < prefix.Length; ++i)
+                prefix[i] ^= AffKey[i & 0xF];
+            if (data_size <= 0x40)
+                return new BinMemoryStream(prefix, entry.Name);
+            var rest = arc.File.CreateStream(entry.Offset + 0x10 + encrypted_length, data_size - encrypted_length);
+            return new PrefixStream(prefix, rest);
+        }
+    }
+    */
 }

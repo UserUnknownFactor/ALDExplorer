@@ -1,15 +1,7 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.IO;
-using System.Text;
 using FreeImageAPI;
 using System.Drawing;
-using System.Reflection;
-using System.Runtime.InteropServices;
-using ZLibNet;
-using System.Diagnostics;
-using System.Globalization;
 
 namespace ALDExplorer.Formats
 {
@@ -549,11 +541,13 @@ namespace ALDExplorer.Formats
 
             for (y = 0; y < pms.height; y++)
             {
-                for (x = 0; x < pms.width; )
+                for (x = 0; x < pms.width;)
                 {
                     int a0 = address;
                     loc = y * scanline + x;
+                    if (bytes.Length >= address) break;
                     c0 = bytes[address++];
+
                     if (c0 <= 0xf7)
                     {
                         //literal
@@ -563,13 +557,15 @@ namespace ALDExplorer.Formats
                     {
                         //copy N+3 bytes from previous scanline
                         l = bytes[address] + 3; x += l; address++;
-                        memcpy(pic, loc, pic, loc - scanline, l);
+                        if (loc - scanline > 0)
+                            memcpy(pic, loc, pic, loc - scanline, l);
                     }
                     else if (c0 == 0xfe)
                     {
                         //copy N+3 bytes from two scanlines ago
                         l = bytes[address] + 3; x += l; address++;
-                        memcpy(pic, loc, pic, loc - scanline * 2, l);
+                        if (loc - scanline * 2 > 0)
+                            memcpy(pic, loc, pic, loc - scanline * 2, l);
                     }
                     else if (c0 == 0xfd)
                     {
@@ -614,7 +610,7 @@ namespace ALDExplorer.Formats
 
             for (y = 0; y < pmsHeader.height; y++)
             {
-                for (x = 0; x < pmsHeader.width; )
+                for (x = 0; x < pmsHeader.width;)
                 {
                     loc = y * scanline + x;
                     c0 = bytes[bytePosition++];

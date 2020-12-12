@@ -4,12 +4,12 @@ using System.Linq;
 using System.IO;
 using System.Text;
 using FreeImageAPI;
-using System.Drawing;
+//using System.Drawing;
 using System.Reflection;
-using System.Runtime.InteropServices;
-using ZLibNet;
+//using System.Runtime.InteropServices;
+//using ZLibNet;
 using System.Diagnostics;
-using System.Globalization;
+//using System.Globalization;
 using ALDExplorer.Formats;
 
 namespace ALDExplorer

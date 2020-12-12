@@ -1,14 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.IO;
-using System.Text;
 using FreeImageAPI;
-using System.Drawing;
-using System.Reflection;
-using System.Runtime.InteropServices;
 using ZLibNet;
-using System.Diagnostics;
 using System.Globalization;
 
 namespace ALDExplorer.Formats
@@ -190,13 +184,17 @@ namespace ALDExplorer.Formats
             jpegImage.Tag = ajpHeader;
             jpegImage.Comment = ajpHeader.GetComment();
 
-            if (pmsFile != null)
+            if (pmsFile != null && pmsFile.Length > 0)
             {
                 pmsFile.Position = 0;
-                FreeImageBitmap pmsImage = Pms.LoadImage(pmsFile.ToArray());
-                jpegImage.ConvertColorDepth(FREE_IMAGE_COLOR_DEPTH.FICD_32_BPP);
-                jpegImage.SetChannel(pmsImage, FREE_IMAGE_COLOR_CHANNEL.FICC_ALPHA);
-                pmsImage.Dispose();
+                using (var pmsImage = Pms.LoadImage(pmsFile.ToArray()))
+                {
+                    if (pmsImage == null)
+                        return jpegImage;
+                    jpegImage.ConvertColorDepth(FREE_IMAGE_COLOR_DEPTH.FICD_32_BPP);
+                    jpegImage.SetChannel(pmsImage, FREE_IMAGE_COLOR_CHANNEL.FICC_ALPHA);
+                }
+
             }
 
             return jpegImage;
@@ -229,9 +227,7 @@ namespace ALDExplorer.Formats
             var brAjp = new BinaryReader(ajpStream);
             ajpHeader = ReadAjpHeader(brAjp);
             if (ajpHeader == null)
-            {
                 return;
-            }
             MemoryStream newJpegFileStream = new MemoryStream();
 
             jpegFile = new MemoryStream(ajpHeader.jpegDataLength);
@@ -525,6 +521,8 @@ namespace ALDExplorer.Formats
                 ajp.width = br.ReadInt32();
                 ajp.height = br.ReadInt32();
                 ajp.headerSize2 = br.ReadInt32();
+                if (ajp.width > 100000 || ajp.width > 100000 || ajp.headerSize2 > 10000)
+                    throw new System.IO.IOException("AJP header error");
                 ajp.jpegDataLength = br.ReadInt32();
                 ajp.alphaLocation = br.ReadInt32();
                 ajp.sizeOfDataAfterJpeg = br.ReadInt32();

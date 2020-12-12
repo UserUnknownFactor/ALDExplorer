@@ -1,15 +1,15 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
+//using System.ComponentModel;
 using System.Data;
-using System.Drawing;
+//using System.Drawing;
 using System.Linq;
 using System.IO;
 using System.Text;
 using System.Windows.Forms;
 using FreeImageAPI;
 using System.Diagnostics;
-using WMPLib;
+//using WMPLib;
 //using DDW.Swf;
 using ALDExplorer.Formats;
 
@@ -56,7 +56,7 @@ namespace ALDExplorer
                 using (var fs = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                 {
                     var outName = Path.GetDirectoryName(fileName) + Path.DirectorySeparatorChar + Path.GetFileNameWithoutExtension(fileName) + to;
-                    switch (to)
+                    if (bitmap != null) switch (to)
                     {
                         case ".png":
                             bitmap.Save(outName, FREE_IMAGE_FORMAT.FIF_PNG);
@@ -1450,12 +1450,11 @@ namespace ALDExplorer
                 if (bitmap == null) { try { bitmap = new FreeImageBitmap(fileStream, FREE_IMAGE_FORMAT.FIF_BMP); } catch { } }
                 if (bitmap == null) { try { bitmap = new FreeImageBitmap(fileStream); } catch { } }
                 //if (bitmap == null) { try { bitmap = LoadSwfBitmap(fileBytes); } catch (Exception ex) { } }
-            }
-
-            if (bitmap == null && Debugger.IsAttached)
-            {
-                //Debug.Print("");
-                //Debugger.Break();
+                if (bitmap == null && Debugger.IsAttached)
+                {
+                    //Debug.Print("");
+                    Debugger.Break();
+                }
             }
 
             return bitmap;
@@ -1876,9 +1875,7 @@ namespace ALDExplorer
                 }
             }
             if (fileNames == null || fileNames.Length == 0)
-            {
                 return;
-            }
 
             bool anyPngFiles = AnyPngFiles(fileNames);
             bool anySwfFiles = AnySwfFiles(fileNames);
@@ -2575,9 +2572,20 @@ namespace ALDExplorer
             using (var openFileDialog = new OpenFileDialog())
             {
                 openFileDialog.Filter = "PNG Image (*.PNG)|*.png|All Files (*.*)|*.*";
+                openFileDialog.Multiselect = true;
                 if (openFileDialog.ShowDialog() == DialogResult.OK)
                 {
-                    ConvertFile(openFileDialog.FileName, extension);
+                    string[] fileNames = openFileDialog.FileNames;
+                    if (fileNames == null || fileNames.Length == 0)
+                        return;
+
+                    foreach (var fileName in fileNames)
+                    {
+                        var ext = Path.GetExtension(fileName);
+                        if (ext.Substring(1).ToUpper() != "PNG")
+                            continue;
+                        ConvertFile(fileName, extension);
+                    }
                 }
             }
         }
@@ -2602,12 +2610,21 @@ namespace ALDExplorer
             using (var openFileDialog = new OpenFileDialog())
             {
                 openFileDialog.Filter = "AliceSoft Image (*.PNS,*.QNT,*.AJP)|*.ajp;*.qnt;*.pns;*.jpeg|All Files (*.*)|*.*";
+                openFileDialog.Multiselect = true;
                 if (openFileDialog.ShowDialog() == DialogResult.OK)
                 {
-                    var ext = Path.GetExtension(openFileDialog.FileName);
-                    var extBIG = ext.Substring(1).ToUpper();
-                    if (extBIG != "AJP" && extBIG != "PNS" && extBIG != "QNT" && extBIG != "JPG" && extBIG != "JPEG") return;
-                    ConvertFile(openFileDialog.FileName, ".png");
+                    string[] fileNames = openFileDialog.FileNames;
+                    if (fileNames == null || fileNames.Length == 0)
+                        return;
+
+                    foreach (var fileName in fileNames)
+                    {
+                        var ext = Path.GetExtension(fileName);
+                        var extBIG = ext.Substring(1).ToUpper();
+                        if (extBIG != "AJP" && extBIG != "PNS" && extBIG != "QNT" && extBIG != "JPG" && extBIG != "JPEG")
+                            continue;
+                        ConvertFile(fileName, ".png");
+                    }
                 }
             }
         }
