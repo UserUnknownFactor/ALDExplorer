@@ -76,6 +76,7 @@
             this.statusStrip1 = new System.Windows.Forms.StatusStrip();
             this.loadProgress = new System.Windows.Forms.ToolStripProgressBar();
             this.toolStatusText = new System.Windows.Forms.ToolStripStatusLabel();
+            this.cmenuFLAT2PNG = new System.Windows.Forms.ToolStripMenuItem();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
             this.splitContainer1.Panel1.SuspendLayout();
             this.splitContainer1.Panel2.SuspendLayout();
@@ -392,7 +393,8 @@
             this.toolStripSeparator2,
             this.cmenuQNT2PNG,
             this.cmenuAJP2PNG,
-            this.cmenuPNS2PNG});
+            this.cmenuPNS2PNG,
+            this.cmenuFLAT2PNG});
             this.convertToolStripMenuItem.Name = "convertToolStripMenuItem";
             this.convertToolStripMenuItem.Size = new System.Drawing.Size(61, 20);
             this.convertToolStripMenuItem.Text = "&Convert";
@@ -474,6 +476,13 @@
             this.toolStatusText.Name = "toolStatusText";
             this.toolStatusText.Size = new System.Drawing.Size(48, 17);
             this.toolStatusText.Text = "Ready...";
+            // 
+            // cmenuFLAT2PNG
+            // 
+            this.cmenuFLAT2PNG.Name = "cmenuFLAT2PNG";
+            this.cmenuFLAT2PNG.Size = new System.Drawing.Size(180, 22);
+            this.cmenuFLAT2PNG.Text = "FLAT -> PNG";
+            this.cmenuFLAT2PNG.Click += new System.EventHandler(this.cmenuFLAT2PNG_Click);
             // 
             // Form1
             // 
@@ -557,6 +566,7 @@
         private System.Windows.Forms.ToolStripMenuItem cmenuPNG2PNS;
         private System.Windows.Forms.ToolStripMenuItem cmenuPNS2PNG;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator2;
+        private System.Windows.Forms.ToolStripMenuItem cmenuFLAT2PNG;
     }
 }
 

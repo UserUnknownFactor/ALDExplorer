@@ -383,9 +383,7 @@ namespace ALDExplorer.Formats
         public static PmsHeader GetHeader(byte[] bytes)
         {
             if (bytes.Length < 44)
-            {
                 throw new InvalidDataException("PMS header is too short");
-            }
 
             var ms = new MemoryStream(bytes);
             var br = new BinaryReader(ms);
@@ -411,20 +409,15 @@ namespace ALDExplorer.Formats
             int lastHeaderAddress2 = Math.Max(pms.headerSize, pms.addressOfData);
             lastHeaderAddress = Math.Min(lastHeaderAddress, lastHeaderAddress2);
             if (lastHeaderAddress > bytes.Length)
-            {
                 lastHeaderAddress = bytes.Length;
-            }
 
             int extraDataSize = lastHeaderAddress - (int)ms.Position;
             if (extraDataSize >= 1024 * 1024)
-            {
                 throw new InvalidDataException("Too much extra data for PMS file");
-            }
 
             if (extraDataSize >= 0)
-            {
                 pms.extraData = br.ReadBytes(extraDataSize);
-            }
+
             /*
             if (pms.addressOfComment != 0)
             {
@@ -442,7 +435,6 @@ namespace ALDExplorer.Formats
 
             var bw = new BinaryWriter(stream);
             bw.Write((ushort)pms.signature);
-            //bw.Write(ASCIIEncoding.ASCII.GetBytes("PM"));
             bw.Write((ushort)pms.version);
             bw.Write((ushort)pms.headerSize);
             bw.Write((byte)pms.colorDepth);
@@ -504,12 +496,6 @@ namespace ALDExplorer.Formats
                 length = dest.Length - destIndex;
             }
             Array.Copy(src, srcIndex, dest, destIndex, length);
-            /*
-            for (int i = 0; i < length; i++)
-            {
-               dest[destIndex + i] = src[srcIndex + i];
-            }
-            */
         }
 
         static void memset(byte[] bytes, int index, byte value, int count)
@@ -557,15 +543,15 @@ namespace ALDExplorer.Formats
                     {
                         //copy N+3 bytes from previous scanline
                         l = bytes[address] + 3; x += l; address++;
-                        if (loc - scanline > 0)
-                            memcpy(pic, loc, pic, loc - scanline, l);
+                        //if (loc - scanline > 0)
+                        memcpy(pic, loc, pic, loc - scanline, l);
                     }
                     else if (c0 == 0xfe)
                     {
                         //copy N+3 bytes from two scanlines ago
                         l = bytes[address] + 3; x += l; address++;
-                        if (loc - scanline * 2 > 0)
-                            memcpy(pic, loc, pic, loc - scanline * 2, l);
+                        //if (loc - scanline * 2 > 0)
+                        memcpy(pic, loc, pic, loc - scanline * 2, l);
                     }
                     else if (c0 == 0xfd)
                     {
@@ -688,101 +674,7 @@ namespace ALDExplorer.Formats
                 }
             }
             return pic;
-            //ushort[] pic = new ushort[pmsHeader.width * pmsHeader.height];
-            //int c0, c1, pc0, pc1;
-            //int x, y, i, l, loc;
-            //int position = 0;
-            //int scanline = pmsHeader.width;
 
-            //for (y = 0; y < pmsHeader.height; y++)
-            //{
-            //    for (x = 0; x < pmsHeader.width; )
-            //    {
-            //        loc = y * scanline + x;
-            //        c0 = bytes[position++];
-            //        if (c0 <= 0xf7)
-            //        {
-            //            c1 = bytes[position++]; x++;
-            //            pic[loc] = (ushort)(c0 | (c1 << 8));
-            //        }
-            //        else if (c0 == 0xff)
-            //        {
-            //            c1 = bytes[position++];
-            //            //if (loc - scanline < 0)
-            //            //{
-            //            //    pic[loc] = (ushort)(c0 | (c1 << 8));
-            //            //    x++;
-            //            //}
-            //            //else
-            //            {
-            //                l = c1 + 2; x += l; position++;
-            //                for (i = 0; i < l; i++)
-            //                {
-            //                    pic[loc + i] = pic[loc + i - scanline];
-            //                }
-            //            }
-            //        }
-            //        else if (c0 == 0xfe)
-            //        {
-            //            l = bytes[position] + 2; x += l; position++;
-            //            for (i = 0; i < l; i++)
-            //            {
-            //                pic[loc + i] = pic[loc + i - scanline * 2];
-            //            }
-            //        }
-            //        else if (c0 == 0xfd)
-            //        {
-            //            l = bytes[position] + 3; x += l; position++;
-            //            c0 = bytes[position++]; c1 = bytes[position++];
-            //            pc0 = c0 | (c1 << 8);
-            //            for (i = 0; i < l; i++)
-            //            {
-            //                pic[loc + i] = (ushort)pc0;
-            //            }
-            //        }
-            //        else if (c0 == 0xfc)
-            //        {
-            //            l = (bytes[position] + 2) * 2; x += l; position++;
-            //            c0 = bytes[position++]; c1 = bytes[position++]; pc0 = c0 | (c1 << 8);
-            //            c0 = bytes[position++]; c1 = bytes[position++]; pc1 = c0 | (c1 << 8);
-            //            for (i = 0; i < l; i += 2)
-            //            {
-            //                pic[loc + i] = (ushort)pc0;
-            //                pic[loc + i + 1] = (ushort)pc1;
-            //            }
-            //        }
-            //        else if (c0 == 0xfb)
-            //        {
-            //            x++;
-            //            pic[loc] = pic[loc - scanline - 1];
-            //        }
-            //        else if (c0 == 0xfa)
-            //        {
-            //            x++;
-            //            pic[loc] = pic[loc - scanline + 1];
-            //        }
-            //        else if (c0 == 0xf9)
-            //        {
-            //            l = bytes[position] + 1; x += l; position++;
-            //            c0 = bytes[position++]; c1 = bytes[position++];
-            //            pc0 = ((c0 & 0xe0) << 8) + ((c0 & 0x18) << 6) + ((c0 & 0x07) << 2);
-            //            pc1 = ((c1 & 0xc0) << 5) + ((c1 & 0x3c) << 3) + (c1 & 0x03);
-            //            pic[loc] = (ushort)(pc0 + pc1);
-            //            for (i = 1; i < l; i++)
-            //            {
-            //                c1 = bytes[position++];
-            //                pc1 = ((c1 & 0xc0) << 5) + ((c1 & 0x3c) << 3) + (c1 & 0x03);
-            //                pic[loc + i] = (ushort)(pc0 | pc1);
-            //            }
-            //        }
-            //        else
-            //        {
-            //            c0 = bytes[position++]; c1 = bytes[position++]; x++;
-            //            pic[loc] = (ushort)(c0 | (c1 << 8));
-            //        }
-            //    }
-            //}
-            //return pic;
         }
 
         internal static void SaveImageData8Bit(Stream stream, FreeImageBitmap bitmap)
@@ -1049,14 +941,6 @@ namespace ALDExplorer.Formats
             BinaryWriter bw = new BinaryWriter(stream);
 
             ////JUNK PASS: all literals
-            /*
-            for (i = 0; i < pic.Length; i++)
-            {
-               bw.Write((byte)0xF8);
-               bw.Write((ushort)pic[i]);
-            }
-            return;
-            */
 
             //pass #2
             ms.Position = 0;

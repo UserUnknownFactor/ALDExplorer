@@ -335,9 +335,7 @@ namespace ALDExplorer
         {
             var qntHeader = Qnt.GetQntHeader(stream);
             if (qntHeader == null || !qntHeader.Validate())
-            {
                 return null;
-            }
             return qntHeader;
         }
 
@@ -371,6 +369,8 @@ namespace ALDExplorer
             var br = new BinaryReader(stream);
             var ajpHeader = Ajp.ReadAjpHeader(br);
             stream.Position = oldPosition;
+            if (ajpHeader == null || !ajpHeader.Validate())
+                return null;
             return ajpHeader;
         }
 

@@ -1052,26 +1052,18 @@ namespace ALDExplorer
                 saveFileDialog.CheckPathExists = true;
 
                 if (bitmap != null)
-                {
                     saveFileDialog.Filter = "PNG Files (*.png)|*.png|BMP Files (*.bmp)|*.bmp|GIF Files (*.gif)|*.gif|JPG Files (*.jpg)|*.jpg|TGA Files (*.tga)|*.tga|All Files (*.*)|*.*";
-                }
                 else
-                {
                     saveFileDialog.Filter = "All Files (*.*)|*.*";
-                }
-                string desiredExt = GetDesiredExtension(extension, bitmap);
 
+                string desiredExt = GetDesiredExtension(extension, bitmap);
                 saveFileDialog.DefaultExt = desiredExt;
                 saveFileDialog.FileName = Path.ChangeExtension(inputFileName, desiredExt);
 
                 if (saveFileDialog.ShowDialog() == DialogResult.OK)
-                {
                     outputFileName = saveFileDialog.FileName;
-                }
                 else
-                {
                     outputFileName = null;
-                }
             }
             return outputFileName;
         }
@@ -2627,6 +2619,38 @@ namespace ALDExplorer
                     }
                 }
             }
+        }
+
+        private void cmenuFLAT2PNG_Click(object sender, EventArgs e)
+        {
+            using (var openFileDialog = new OpenFileDialog())
+            {
+                openFileDialog.Filter = "AliceSoft FLAT (*.flat)|*.flat|All Files (*.*)|*.*";
+                openFileDialog.Multiselect = true;
+                if (openFileDialog.ShowDialog() == DialogResult.OK)
+                {
+                    string[] fileNames = openFileDialog.FileNames;
+                    if (fileNames == null || fileNames.Length == 0)
+                        return;
+
+                    foreach (var fileName in fileNames)
+                    {
+                        var ext = Path.GetExtension(fileName);
+                        var extBIG = ext.Substring(1).ToUpper();
+                        if (extBIG != "FLAT")
+                            continue;
+                        var fileBytes = File.ReadAllBytes(fileName);
+                        foreach (var node in FLAT.GetNodes(fileBytes, fileName, null))
+                        {
+                            var bitmap = ImageConverter.LoadAjp(node.Bytes);
+                            var outName = Path.GetDirectoryName(fileName) + Path.DirectorySeparatorChar + Path.GetFileNameWithoutExtension(node.FileName) + ".png";
+                            bitmap.Save(outName, FREE_IMAGE_FORMAT.FIF_PNG);
+                        }
+                        
+                    }
+                }
+            }
+            
         }
     }
 

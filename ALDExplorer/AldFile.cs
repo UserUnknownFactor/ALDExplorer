@@ -11,12 +11,20 @@ using FreeImageAPI;
 using System.Diagnostics;
 using ALDExplorer.Formats;
 using ZLibNet;
+using HexDump;
 
 namespace ALDExplorer
 {
     using Node = AldFileSubimages.SubImageFinder.Node;
     using SubImageFinder = AldFileSubimages.SubImageFinder;
     //using DDW.Swf;
+
+    public class BaseNode
+    {
+        public string FileName;
+        public byte[] Bytes;
+        public long Offset;
+    }
 
     public class AldFileCollection
     {
@@ -723,7 +731,7 @@ namespace ALDExplorer
             }
             else if (fileType == AldFileType.AFA1File || fileType == AldFileType.AFA2File || fileType == AldFileType.AFA3File)
             {
-                int version = fileType == AldFileType.AFA2File || fileType == AldFileType.AFA3File ? 2 : 1;
+                int version = (fileType == AldFileType.AFA2File || fileType == AldFileType.AFA3File) ? 2 : 1;
                 using (var fs = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                 {
                     AldFileEntry[] entries;
@@ -1249,9 +1257,7 @@ namespace ALDExplorer
 
                     long fileLength = fs.Length;
                     if (fileLength < 64 || fileLength > uint.MaxValue)
-                    {
                         return null;
-                    }
 
                     var br = new BinaryReader(fs);
                     br.BaseStream.Position = 0;
@@ -1263,12 +1269,9 @@ namespace ALDExplorer
                     version = br.ReadInt32();
 
                     if (magic != "AFAH" || version != 3)
-                    {
                         return null;
-                    }
 
-                    uint index_size = br.ReadUInt32();
-                    var index = new AfaIndexReader3(fs, index_size);
+                    var index = new AfaIndexReader3(fs, headerLength);
                     var dir = index.Read();
                     if (dir == null)
                         return null;
@@ -2133,7 +2136,8 @@ namespace ALDExplorer
         {
             byte[] indexBlock;
             bool dontPad = false;
-            if (this.fileType == AldFileType.AFA1File || this.fileType == AldFileType.AFA2File || this.fileType == AldFileType.AlkFile)
+            if (this.fileType == AldFileType.AFA1File || this.fileType == AldFileType.AFA2File || 
+                this.fileType == AldFileType.AFA3File || this.fileType == AldFileType.AlkFile)
             {
                 dontPad = true;
             }
@@ -2161,7 +2165,8 @@ namespace ALDExplorer
                     indexBlock = new byte[0];
                     //indexBlock = CreateAlkIndexBlock(this.FileEntries.Count);
                 }
-                else if (this.FileType == AldFileType.AFA1File || this.FileType == AldFileType.AFA2File)
+                else if (this.FileType == AldFileType.AFA1File || this.FileType == AldFileType.AFA2File || 
+                    this.FileType == AldFileType.AFA3File)
                 {
                     indexBlock = new byte[0];
                 }
@@ -2189,9 +2194,11 @@ namespace ALDExplorer
             {
                 sizeOfFilesBlock = (numberOfFiles + 1) * 8;
             }
-            else if (this.fileType == AldFileType.AFA1File || this.fileType == AldFileType.AFA2File)
+            else if (this.fileType == AldFileType.AFA1File || this.fileType == AldFileType.AFA2File || 
+                this.fileType == AldFileType.AFA3File)
             {
-                int estimatedHeaderSize = AldUtil.EstimateAfaHeaderSize(this.FileEntries, this.FileType == AldFileType.AFA2File);
+                int estimatedHeaderSize = AldUtil.EstimateAfaHeaderSize(this.FileEntries, 
+                    this.FileType == AldFileType.AFA2File || this.fileType == AldFileType.AFA3File);
                 int headerSize = estimatedHeaderSize;
                 headerSize += 64;
                 headerSize += 4095;
@@ -2294,10 +2301,12 @@ namespace ALDExplorer
                         bw.Write((uint)length);
                     }
                 }
-                else if (this.fileType == AldFileType.AFA1File || this.fileType == AldFileType.AFA2File)
+                else if (this.fileType == AldFileType.AFA1File || this.fileType == AldFileType.AFA2File || 
+                    this.fileType == AldFileType.AFA3File)
                 {
                     fs.Position = 0;
-                    AldUtil.WriteAfaHeader(fs, this.FileEntries, sizeOfFilesBlock - 8, this.FileType == AldFileType.AFA2File ? 2 : 1);
+                    AldUtil.WriteAfaHeader(fs, this.FileEntries, sizeOfFilesBlock - 8, 
+                        this.FileType == AldFileType.AFA2File || this.fileType == AldFileType.AFA3File ? 2 : 1);
 
 
                 }
@@ -2356,7 +2365,8 @@ namespace ALDExplorer
             {
                 //do nothing
             }
-            else if (this.FileType == AldFileType.AFA1File || this.FileType == AldFileType.AFA2File)
+            else if (this.FileType == AldFileType.AFA1File || this.FileType == AldFileType.AFA2File || 
+                this.fileType == AldFileType.AFA3File)
             {
                 //do nothing
             }
@@ -3390,7 +3400,7 @@ namespace ALDExplorer
                 string sig = ASCIIEncoding.ASCII.GetString(bytes, 0, 3);
                 if (sig == "FLA" || sig == "ELN")
                 {
-                    return GetSubImageNodesFlat(bytes);
+                    return FLAT.GetNodes(bytes, this.entry.FileName, this.entry);
                 }
                 if (sig == "dcf")
                 {
@@ -3414,9 +3424,17 @@ namespace ALDExplorer
             public byte[] ReplaceSubImageNodes(byte[] bytes, Node[] nodes)
             {
                 string sig = ASCIIEncoding.ASCII.GetString(bytes, 0, 3);
-                if (sig == "FLA")
+                if (sig == "FLA" || sig == "ELN")
                 {
-                    return ReplaceSubImageNodesFlat(bytes, nodes);
+                    return FLAT.ReplaceNodes(bytes, nodes);
+                }
+                if (sig == "dcf")
+                {
+                    //return ReplaceSubImageNodesXCF(bytes);
+                }
+                if (sig == "pcf")
+                {
+                    //return ReplaceSubImageNodesXCF(bytes);
                 }
                 if (sig == "AFF")
                 {
@@ -3429,12 +3447,16 @@ namespace ALDExplorer
                 return null;
             }
 
-            public class Node : ICloneable
+            public class Node : BaseNode, ICloneable
             {
-                public string FileName;
-                public byte[] Bytes;
-                public long Offset;
                 public AldFileEntry Parent;
+
+                public void fromBase(BaseNode bnode)
+                {
+                    this.FileName = bnode.FileName;
+                    this.Bytes = bnode.Bytes;
+                    this.Offset = bnode.Offset;
+                }
 
                 public Node Clone()
                 {
@@ -3452,17 +3474,6 @@ namespace ALDExplorer
             }
 
             static Encoding shiftJis = Encoding.GetEncoding("shift-jis");
-
-            public Node[] GetSubImageNodesFlat(byte[] bytes)
-            {
-                return FLAT.GetNodes(bytes, this.entry);
-                    
-            }
-
-            public byte[] ReplaceSubImageNodesFlat(byte[] bytes, Node[] nodes)
-            {
-                return FLAT.ReplaceNodes(ref bytes, ref nodes);
-            }
 
 
             /*
@@ -3667,25 +3678,29 @@ namespace ALDExplorer
     internal sealed class AfaIndexReader3
     {
         FileStream m_file;
-        uint m_data_offset;
+        int m_index_size;
         byte[] m_dict;
 
-        public AfaIndexReader3(FileStream fs, uint index_size)
+        public AfaIndexReader3(FileStream fs, int index_size)
         {
             m_file = fs;
-            m_data_offset = index_size + 8;
+            m_index_size = index_size + 8;
         }
 
         public List<AldFileEntry> Read()
         {
-            byte[] packed;
+            byte[] packed, original;
             int packed_size, unpacked_size;
 
             m_file.Seek(12, SeekOrigin.Begin);
-            using (var bs1 = new BinaryReader(m_file))
-            using (var input = new MemoryStream(bs1.ReadBytes((int)m_data_offset - 12)))
+            var br = new BinaryReader(m_file);
+            original = br.ReadBytes((int)m_index_size-12);
+            HexView.Debugger(original.Slice(0, 50));
+
+            using (var input = new MemoryStream(original))
             using (var bits = new MsbBitStream(input))
             {
+                
                 bits.GetNextBit();
                 m_dict = ReadBytes(bits);
                 if (null == m_dict)
@@ -3694,10 +3709,9 @@ namespace ALDExplorer
                 unpacked_size = ReadInt32(bits);
                 packed = new byte[packed_size];
                 for (int i = 0; i < packed_size; ++i)
-                {
                     packed[i] = (byte)bits.GetBits(8);
-                }
             }
+            HexView.Debugger(packed.Slice(0, 50));
             List<AldFileEntry> dir = new List<AldFileEntry>();
 
             using (var bstr = new MemoryStream(packed))
@@ -3716,17 +3730,14 @@ namespace ALDExplorer
                     var name_buf = ReadEncryptedChars(index);
                     if (null == name_buf)
                         return null;
-                    var name = "";
-
-                        name = DecryptString(name_buf, name_buf.Length);
+                    var name = DecryptString(name_buf, name_buf.Length);
 
 
                     AldFileEntry entry = new AldFileEntry();
-
                     ReadInt32(index);
                     ReadInt32(index);
 
-                    entry.FileAddress = (uint)ReadInt32(index) + m_data_offset;
+                    entry.FileAddress = (uint)ReadInt32(index) + m_index_size;
                     entry.FileSize = (uint)ReadInt32(index);
                     entry.FileName = name;
                     entry.Index = i;
@@ -3806,7 +3817,7 @@ namespace ALDExplorer
                 m_string_buf = new byte[input_length];
             for (int i = 0; i < input_length; ++i)
             {
-                Debug.Assert(input[i] > m_dict.Length, $"{i}-th index is out of range {input[i]} > {m_dict.Length}");
+                Debug.Assert(input[i] < m_dict.Length, $"{i}-th index is out of range {input[i]} > {m_dict.Length}");
                 m_string_buf[i] = (byte)(m_dict[input[i]] ^ 0xA4);
             }
             return shiftJis.GetString(m_string_buf, 0, input_length);
