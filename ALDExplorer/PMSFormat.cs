@@ -79,9 +79,8 @@ namespace ALDExplorer.Formats
         {
             var pmsHeader = GetHeader(bytes);
             if (pmsHeader.xLocation < 0 || pmsHeader.yLocation < 0 || pmsHeader.width < 0 || pmsHeader.height < 0)
-            {
                 return null;
-            }
+
             int firstData = Math.Min(pmsHeader.addressOfPalette, pmsHeader.addressOfData);
             if (firstData == 0) firstData = Math.Max(pmsHeader.addressOfPalette, pmsHeader.addressOfData);
             int lastHeaderAddress = Math.Max(firstData, pmsHeader.headerSize);
@@ -178,6 +177,12 @@ namespace ALDExplorer.Formats
             else
             {
                 byte[] imageData;
+                if (!pmsHeader.Validate())
+                {
+                    System.Diagnostics.Debug.Print("Wrong PMS header in file");
+                    HexDump.HexView.Debugger(bytes.Slice(0, 40));
+                    return null;
+                }
                 imageData = GetImageData8Bit(pmsHeader, bytes);
                 FreeImageBitmap bitmap = new FreeImageBitmap(pmsHeader.width, pmsHeader.height, pmsHeader.width, 8, FREE_IMAGE_TYPE.FIT_BITMAP, imageData);
                 GetPalette(bitmap.Palette, pmsHeader, bytes);

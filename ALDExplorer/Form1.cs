@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-//using System.ComponentModel;
+using System.ComponentModel;
 using System.Data;
-//using System.Drawing;
+using System.Drawing;
 using System.Linq;
 using System.IO;
 using System.Text;
@@ -19,11 +19,16 @@ namespace ALDExplorer
     {
         AldFileCollection loadedAldFile = null;
         //AldFileCollection loadedAldFiles = null;
+        public const string emptySearchPrompt = "Please Enter Filter...";
+
         public Form1()
         {
             Debug.Listeners.Add(new TextWriterTraceListener(Console.Out));
             Debug.AutoFlush = true;
             InitializeComponent();
+            searchBox.Text = emptySearchPrompt;
+            backgroundOpener.WorkerReportsProgress = true;
+            backgroundOpener.WorkerSupportsCancellation = false;
         }
 
         bool DoNotConvertImageFiles
@@ -45,7 +50,17 @@ namespace ALDExplorer
 
         private void openToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            OpenFile();
+            using (var openFileDialog = new OpenFileDialog())
+            {
+                openFileDialog.Filter = "AliceSoft Archive Files (*.ALD;*.AFA;*.ALK;*.DAT)|*.ald;*.afa;*.alk;*.dat|All Files (*.*)|*.*";
+                if (openFileDialog.ShowDialog() == DialogResult.OK)
+                {
+                    loadProgress.Visible = true;
+                    if (backgroundOpener.IsBusy != true)
+                        backgroundOpener.RunWorkerAsync(openFileDialog.FileName);
+                }
+            }
+            //OpenFile();
         }
 
         private void ConvertFile(string fileName, string to)
@@ -57,59 +72,49 @@ namespace ALDExplorer
                 {
                     var outName = Path.GetDirectoryName(fileName) + Path.DirectorySeparatorChar + Path.GetFileNameWithoutExtension(fileName) + to;
                     if (bitmap != null) switch (to)
-                    {
-                        case ".png":
-                            bitmap.Save(outName, FREE_IMAGE_FORMAT.FIF_PNG);
-                            Debug.Print("written to: " + outName);
-                            break;
-                        case ".ajp":
-                            using (var ms = new FileStream(outName, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
-                                ImageConverter.SaveAjp(ms, bitmap);
-                            Debug.Print("written to: " + outName);
-                            break;
-                        case ".vsp":
-                            using (var ms = new FileStream(outName, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
-                                ImageConverter.SaveVsp(ms, bitmap);
-                            Debug.Print("written to: " + outName);
-                            break;
-                        case ".pms":
-                            using (var ms = new FileStream(outName, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
-                                ImageConverter.SavePms(ms, bitmap);
-                            Debug.Print("written to: " + outName);
-                            break;
-                        case ".qnt":
-                            using (var ms = new FileStream(outName, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
-                                ImageConverter.SaveQnt(ms, bitmap);
-                            Debug.Print("written to: " + outName);
-                            break;
-                    }
+                        {
+                            case ".png":
+                                bitmap.Save(outName, FREE_IMAGE_FORMAT.FIF_PNG);
+                                Debug.Print("written to: " + outName);
+                                break;
+                            case ".ajp":
+                                using (var ms = new FileStream(outName, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
+                                    ImageConverter.SaveAjp(ms, bitmap);
+                                Debug.Print("written to: " + outName);
+                                break;
+                            case ".vsp":
+                                using (var ms = new FileStream(outName, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
+                                    ImageConverter.SaveVsp(ms, bitmap);
+                                Debug.Print("written to: " + outName);
+                                break;
+                            case ".pms":
+                                using (var ms = new FileStream(outName, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
+                                    ImageConverter.SavePms(ms, bitmap);
+                                Debug.Print("written to: " + outName);
+                                break;
+                            case ".qnt":
+                                using (var ms = new FileStream(outName, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
+                                    ImageConverter.SaveQnt(ms, bitmap);
+                                Debug.Print("written to: " + outName);
+                                break;
+                        }
                 }
             }
             catch (InvalidDataException)
             {
-                MessageBox.Show(this, "The loaded file is not a valid " + 
-                    Path.GetExtension(fileName).Substring(1).ToUpper() + 
+                MessageBox.Show(this, "The loaded file is not a valid " +
+                    Path.GetExtension(fileName).Substring(1).ToUpper() +
                     " file", "ALDExplorer", MessageBoxButtons.OK, MessageBoxIcon.Stop);
             }
 
             LoadTreeView(false);
         }
 
-        private void OpenFile()
-        {
-            using (var openFileDialog = new OpenFileDialog())
-            {
-                openFileDialog.Filter = "AliceSoft Archive Files (*.ALD;*.AFA;*.ALK;*.DAT)|*.ald;*.afa;*.alk;*.dat|All Files (*.*)|*.*";
-                if (openFileDialog.ShowDialog() == DialogResult.OK)
-                {
-                    OpenFile(openFileDialog.FileName);
-                }
-            }
-        }
-
-        private void OpenFile(string fileName)
+        private void OpenFile(string fileName, BackgroundWorker worker)
         {
             loadedAldFile = new AldFileCollection();
+            if (worker != null)
+                loadedAldFile.ProgressChanged += (_, arg) => worker.ReportProgress(arg.Percentage, arg);
             try
             {
                 loadedAldFile.ReadFile(fileName);
@@ -118,8 +123,6 @@ namespace ALDExplorer
             {
                 MessageBox.Show(this, "The loaded file is not a valid AliceSoft .ALD, .AFA, .ALK, or .DAT file.", "ALDExplorer", MessageBoxButtons.OK, MessageBoxIcon.Stop);
             }
-
-            LoadTreeView(false);
         }
 
         void LoadTreeView()
@@ -130,6 +133,8 @@ namespace ALDExplorer
         private void LoadTreeView(bool preserveItems)
         {
             if (loadedAldFile == null) return;
+
+            searchBox_Leave();
 
             try
             {
@@ -180,7 +185,7 @@ namespace ALDExplorer
                     }
                     else
                     {
-                        newNode2.Text = "Invalid ALD File";
+                        newNode2.Text = "Not an AliceSoft File";
                     }
                     newNode2.Tag = aldFile;
                     newNode2.ImageIndex = 1;
@@ -202,7 +207,7 @@ namespace ALDExplorer
                         }
                         else
                         {
-                            newNode2.Text = "Invalid ALD File";
+                            newNode2.Text = "Not an AliceSoft File";
                         }
                         newNode2.Tag = aldFile;
                         newNode2.ImageIndex = 1;
@@ -211,9 +216,8 @@ namespace ALDExplorer
                     //var newNode = new TreeNode();
                     var newNode = new ListViewItem();
                     if (entry.FileName == null)
-                    {
                         entry.FileName = "CORRUPT FILE " + entry.FileNumber.ToString();
-                    }
+
                     newNode.Text = entry.FileName;
                     newNode.Tag = entry;
                     newNode.SetFileIndentCount();
@@ -221,10 +225,12 @@ namespace ALDExplorer
                     string ext = Path.GetExtension(entry.FileName).ToLowerInvariant();
                     int imageIndex = GetImageIndex(ext);
                     newNode.ImageIndex = imageIndex;
-                    //if (Debugger.IsAttached)
+                    /*if (Debugger.IsAttached)
                     {
-                        newNode.ToolTipText = "File Number: " + (entry.FileNumber) + /*", File Type: " + entry.FileType + */ ", File Size: " + entry.FileSize + ", File Address: " + entry.FileAddress.ToString("X");
-                    }
+                        newNode.ToolTipText = "File Number: " + (entry.FileNumber) + *//*", File Type: " + entry.FileType + *//* ", File Size: " + entry.FileSize + ", File Address: " + entry.FileAddress.ToString("X");
+                    }*/
+                    if (entry.ReplacementFileName != null || entry.ReplacementBytes != null)
+                        newNode.BackColor = Color.LightBlue;
                     itemCollection.Add(newNode);
                 }
                 listView1.AutoResizeColumns(ColumnHeaderAutoResizeStyle.ColumnContent);
@@ -247,9 +253,16 @@ namespace ALDExplorer
                     listView1.SelectedIndices.Clear();
                     SelectItems(selectedEntries);
                 }
+
+                _cachedItems.Clear();
+                _cachedItems.AddRange(listView1.Items.Cast<ListViewItem>());
             }
             finally
             {
+                if (listView1.Items.Count > 0) {
+                    listView1.Items[0].Focused = true;
+                    listView1.Items[0].Selected = true;
+                }
                 listView1.EndUpdate();
             }
         }
@@ -328,77 +341,165 @@ namespace ALDExplorer
         AxShockwaveFlashObjects.AxShockwaveFlash axFlashPlayer = null;
         bool mediaPlayerCreated = false;
         bool flashPlayerCreated = false;
+        List<ListViewItem> _cachedItems = new List<ListViewItem>();
+
+
 
         private void treeView1_AfterSelect(object sender, TreeViewEventArgs e)
         {
             var entry = e.Node.Tag as AldFileEntry;
-            DisplayEntry(entry);
+            if (entry != null)
+            {
+                DisplayEntry(entry);
+            }
+        }
+
+        private void searchBox_Enter()
+        {
+            if (searchBox.Text == emptySearchPrompt)
+            {
+                searchBox.ForeColor = Color.Black;
+                searchBox.Text = "";
+            }
+        }
+
+        private void searchBox_Enter(object sender, EventArgs e)
+        {
+            searchBox_Enter();
+        }
+
+        private void searchBox_Leave()
+        {
+            if (searchBox.Text.Length == 0)
+            {
+                searchBox.ForeColor = Color.Gray;
+                searchBox.Text = emptySearchPrompt;
+            }
+        }
+
+        private void searchBox_Leave(object sender, EventArgs e)
+        {
+            searchBox_Leave();
+        }
+
+        private void searchBox_TextChanged(object sender, EventArgs e)
+        {
+            listView1.BeginUpdate();
+            if (string.IsNullOrEmpty(searchBox.Text) || searchBox.Text == emptySearchPrompt)
+            {
+                if (_cachedItems.Count > 0) {
+                    listView1.Items.Clear();
+                    listView1.Items.AddRange(_cachedItems.ToArray());
+                    listView1.AutoResizeColumns(ColumnHeaderAutoResizeStyle.ColumnContent);
+                }
+                listView1.EndUpdate();
+                return;
+            }
+            listView1.Items.Clear();
+            var list = _cachedItems.Cast<ListViewItem>()
+                               .Where((x, i) => i == 0 ||
+                                       x.SubItems.Cast<ListViewItem.ListViewSubItem>()
+                                       .Any(y => y.Text.Contains(searchBox.Text))
+                                     ).ToArray();
+            /*if (list.Length == 0)
+            {
+                listView1.Items.AddRange(_cachedItems.ToArray());
+                return;
+            }*/
+            listView1.Items.AddRange(list);
+            listView1.AutoResizeColumns(ColumnHeaderAutoResizeStyle.ColumnContent);
+            listView1.EndUpdate();
+        }
+
+
+
+        private void UpdateEntryStatus(AldFileEntry entry) {
+            string hasReplacement = "No";
+            if (entry.ReplacementBytes != null || entry.ReplacementFileName != null)
+                hasReplacement = "Yes";
+            toolStatusText.Text = "File Number: " + (entry.FileNumber) + ", File Size: " + entry.FileSize + ", File Address: " + entry.FileAddress.ToString("X") + ", Has Replacement: " + hasReplacement;
         }
 
         private void DisplayEntry(AldFileEntry entry)
         {
-            if (entry != null)
+            FreeImageBitmap bitmap = null;
+            string extension = Path.GetExtension(entry.FileName).ToLowerInvariant();
+
+            using (bitmap = GetBitmapFromFile(entry))
             {
-                FreeImageBitmap bitmap = null;
-                string extension = Path.GetExtension(entry.FileName).ToLowerInvariant();
-                using (bitmap = GetBitmapFromFile(entry))
+                if (false)
                 {
-                    if (false)
-                    {
 #pragma warning disable CS0162 // Unreachable code detected
-                        if (Debugger.IsAttached && bitmap != null)
-                        {
-                            //long originalSize = entry.FileSize;
-                            using (var ms = new MemoryStream())
-                                switch (extension)
-                                {
-                                    case ".ajp":
-                                        ImageConverter.SaveAjp(ms, bitmap);
-                                        bitmap.Dispose();
-                                        bitmap = ImageConverter.LoadAjp(ms.ToArray());
-                                        break;
-                                    case ".vsp":
-                                        ImageConverter.SaveVsp(ms, bitmap);
-                                        bitmap.Dispose();
-                                        bitmap = ImageConverter.LoadVsp(ms.ToArray());
-                                        break;
-                                    case ".pms":
-                                        ImageConverter.SavePms(ms, bitmap);
-                                        bitmap.Dispose();
-                                        bitmap = ImageConverter.LoadPms(ms.ToArray());
-                                        break;
-                                    case ".qnt":
-                                        ImageConverter.SaveQnt(ms, bitmap);
-                                        bitmap.Dispose();
-                                        bitmap = ImageConverter.LoadQnt(ms.ToArray());
-                                        break;
-                                }
-                        }
+                    if (Debugger.IsAttached && bitmap != null)
+                    {
+                        //long originalSize = entry.FileSize;
+                        using (var ms = new MemoryStream())
+                            switch (extension)
+                            {
+                                case ".ajp":
+                                    ImageConverter.SaveAjp(ms, bitmap);
+                                    bitmap.Dispose();
+                                    bitmap = ImageConverter.LoadAjp(ms.ToArray());
+                                    break;
+                                case ".vsp":
+                                    ImageConverter.SaveVsp(ms, bitmap);
+                                    bitmap.Dispose();
+                                    bitmap = ImageConverter.LoadVsp(ms.ToArray());
+                                    break;
+                                case ".pms":
+                                    ImageConverter.SavePms(ms, bitmap);
+                                    bitmap.Dispose();
+                                    bitmap = ImageConverter.LoadPms(ms.ToArray());
+                                    break;
+                                case ".qnt":
+                                    ImageConverter.SaveQnt(ms, bitmap);
+                                    bitmap.Dispose();
+                                    bitmap = ImageConverter.LoadQnt(ms.ToArray());
+                                    break;
+                            }
+                    }
 #pragma warning restore CS0162 // Unreachable code detected
-                    }
+                }
 
-                    if (extension == ".mid" || extension == ".mp3" || extension == ".ogg" || extension == ".wav")
-                    {
-                        CreateMediaPlayer(entry);
-                    }
+                if (extension == ".mid" || extension == ".mp3" || extension == ".ogg" || extension == ".wav")
+                {
+                    CreateMediaPlayer(entry);
+                    return;
+                }
 
-                    if (extension == ".swf" || extension == ".aff")
-                    {
-                        CreateFlashPlayer(entry);
-                    }
+                if (extension == ".swf" || extension == ".aff")
+                {
+                    CreateFlashPlayer(entry);
+                    return;
+                }
 
-                    if (bitmap != null)
+                if (pictureBox1.Image != null)
+                {
+                    pictureBox1.Image.Dispose();
+                    pictureBox1.Image = null;
+                }
+
+                HideMediaPlayer();
+                HideFlashPlayer();
+
+                if (bitmap != null)
+                {
+                    if (fitImagesToWindowToolStripMenuItem.Checked && (bitmap.Width > pictureBox1.Width || bitmap.Height > pictureBox1.Height))
                     {
-                        HideMediaPlayer();
-                        HideFlashPlayer();
-                        if (pictureBox1.Image != null)
-                        {
-                            pictureBox1.Image.Dispose();
-                            pictureBox1.Image = null;
-                        }
-                        pictureBox1.Image = bitmap.ToBitmap();
-                        pictureBox1.Visible = true;
+                        pictureBox1.SizeMode = PictureBoxSizeMode.Zoom;
+                        pictureBox1.Width = Screen.FromControl(splitContainer1.Panel2).WorkingArea.Width;
+                        pictureBox1.Height = Screen.FromControl(splitContainer1.Panel2).WorkingArea.Height;
                     }
+                    else
+                    {
+                        pictureBox1.SizeMode = PictureBoxSizeMode.CenterImage;
+                    }
+                    pictureBox1.Image = bitmap.ToBitmap();
+                    pictureBox1.Visible = true;
+                }
+                else
+                {
+                    pictureBox1.Visible = false;
                 }
             }
         }
@@ -547,16 +648,7 @@ namespace ALDExplorer
             //    }
             //}
 
-            if (this.loadedAldFile == null)
-            {
-                this.saveAsToolStripMenuItem.Enabled = false;
-                this.saveAsWithPatchToolStripMenuItem.Enabled = false;
-            }
-            else
-            {
-                this.saveAsWithPatchToolStripMenuItem.Enabled = true;
-                this.saveAsToolStripMenuItem.Enabled = true;
-            }
+            this.saveAsToolStripMenuItem.Enabled = (this.loadedAldFile != null);
         }
 
         private void makePatchToolStripMenuItem_Click(object sender, EventArgs e)
@@ -643,15 +735,17 @@ namespace ALDExplorer
         private void Save()
         {
             if (loadedAldFile == null)
-            {
                 return;
-            }
+
             var saveFileDialog = new SaveFileDialog();
             saveFileDialog.FileName = loadedAldFile.AldFileName;
             saveFileDialog.Filter = "AliceSoft Archive Files (*.ALD;*.AFA;*.ALK;*.DAT)|*.ald;*.afa;*.alk;*.dat|All Files (*.*)|*.*";
             if (saveFileDialog.ShowDialog() == DialogResult.OK)
             {
+                listView1.Enabled = false;
                 loadedAldFile.SaveFile(saveFileDialog.FileName);
+                toolStatusText.Text = "File saved:" + saveFileDialog.FileName;
+                listView1.Enabled = true;
             }
         }
 
@@ -663,9 +757,7 @@ namespace ALDExplorer
         private void ImportAll()
         {
             if (loadedAldFile == null)
-            {
                 return;
-            }
 
             string patchDirectory;
 
@@ -686,11 +778,12 @@ namespace ALDExplorer
                     int fileCount = ImportAll(patchDirectory);
                     if (fileCount == 0)
                     {
-                        MessageBox.Show(this, "No matching files were found!", "ALDExplorer", MessageBoxButtons.OK, MessageBoxIcon.Stop);
+                        toolStatusText.Text = "No matching files were found!";
                     }
                     else if (fileCount >= 1)
                     {
-                        MessageBox.Show(this, fileCount.ToString() + " file(s) will be imported the next time this ALD file is saved.", "ALDExplorer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        saveAsWithPatchToolStripMenuItem.Enabled = true;
+                        toolStatusText.Text = fileCount.ToString() + " file(s) will be imported the next time the currently opened file is saved.";
                     }
                 }
             }
@@ -700,12 +793,9 @@ namespace ALDExplorer
         private int ImportAll(string patchDirectory)
         {
             if (loadedAldFile == null)
-            {
                 return -1;
-            }
 
-            var entries = loadedAldFile.FileEntries;
-            return ImportAll2(patchDirectory, entries);
+            return ImportAll2(patchDirectory, loadedAldFile.FileEntries);
         }
 
         private int ImportAll2(string patchDirectory, IList<AldFileEntry> entries)
@@ -720,9 +810,7 @@ namespace ALDExplorer
                 //try current directory and other path
                 bool imported = TryImportFile(patchDirectory, entry, fileName);
                 if (!imported && fileNameThisDirectory != fileName)
-                {
                     imported = TryImportFile(patchDirectory, entry, fileNameThisDirectory);
-                }
 
                 if (entry.HasSubImages())
                 {
@@ -802,9 +890,7 @@ namespace ALDExplorer
 
             var args = Environment.GetCommandLineArgs();
             if (args.Length >= 2)
-            {
-                OpenFile(args[1]);
-            }
+                OpenFile(args[1], null);
         }
 
         private void Form1_DragDrop(object sender, DragEventArgs e)
@@ -813,18 +899,14 @@ namespace ALDExplorer
             {
                 var files = e.Data.GetData(DataFormats.FileDrop) as string[];
                 if (files != null)
-                {
-                    OpenFile(files[0]);
-                }
+                    OpenFile(files[0], null);
             }
         }
 
         private void Form1_DragEnter(object sender, DragEventArgs e)
         {
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
-            {
                 e.Effect = DragDropEffects.Copy;
-            }
         }
 
         private void Form1_DragLeave(object sender, EventArgs e)
@@ -835,9 +917,7 @@ namespace ALDExplorer
         private void Form1_DragOver(object sender, DragEventArgs e)
         {
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
-            {
                 e.Effect = DragDropEffects.Copy;
-            }
         }
 
         private void exportAllToolStripMenuItem_Click(object sender, EventArgs e)
@@ -848,25 +928,20 @@ namespace ALDExplorer
         private void ExportAll()
         {
             if (loadedAldFile == null)
-            {
                 return;
-            }
+
             ExportFiles(loadedAldFile.FileEntries);
         }
 
         private void ExportSelectedFiles()
         {
             if (loadedAldFile == null)
-            {
                 return;
-            }
 
             AldFileEntry[] entries = GetSelectedEntries();
 
             if (entries.Length > 0)
-            {
                 ExportFiles(entries);
-            }
 
         }
 
@@ -881,9 +956,7 @@ namespace ALDExplorer
                 {
                     var entry = node.Tag as AldFileEntry;
                     if (entry != null)
-                    {
                         entries.Add(entry);
-                    }
                 }
             }
             return entries.ToArray();
@@ -1534,17 +1607,16 @@ namespace ALDExplorer
         {
             var toolStripItem = sender as ToolStripMenuItem;
             if (toolStripItem == null)
-            {
                 return;
-            }
+
             bool enabled = (loadedAldFile != null);
             foreach (ToolStripItem item in toolStripItem.DropDownItems)
-            {
                 item.Enabled = enabled;
-            }
+
             doNotConvertImageFilesToolStripMenuItem.Enabled = true;
             alwaysRemapPaletteToolStripMenuItem.Enabled = true;
             includeDirectoriesWhenExportingFilesToolStripMenuItem.Enabled = true;
+            fitImagesToWindowToolStripMenuItem.Enabled = true;
         }
 
         private void newALDFileToolStripMenuItem_Click(object sender, EventArgs e)
@@ -1640,38 +1712,41 @@ namespace ALDExplorer
         {
             var selectedNode = listView1.FocusedItem;
             if (selectedNode == null || selectedNode.Selected != true)
-            {
                 selectedNode = listView1.SelectedItems.OfType<ListViewItem>().FirstOrDefault();
-            }
+
             return selectedNode;
         }
 
         private void replaceFileToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            ReplaceFiles(GetSelectedEntries());
+            if (ReplaceFiles(GetSelectedEntries()) > 0)
+                saveAsWithPatchToolStripMenuItem.Enabled = true;
         }
 
-        private void ReplaceFiles(IEnumerable<AldFileEntry> selectedEntries)
+        private uint ReplaceFiles(IEnumerable<AldFileEntry> selectedEntries)
         {
             int count = selectedEntries.Count();
             if (count == 0)
+                return 0;
+
+            if (count == 1) 
             {
-                return;
-            }
-            if (count == 1)
-            {
-                ReplaceFile(selectedEntries.FirstOrDefault());
-                return;
+                if (ReplaceFile(selectedEntries.FirstOrDefault()))
+                    return 1;
+                else
+                    return 0;
             }
 
             //todo: better UI for replacing files
+            uint replaced = 0;
             foreach (var f in selectedEntries)
             {
                 if (!ReplaceFile(f))
-                {
                     break;
-                }
+                else
+                    replaced++;
             }
+            return replaced;
         }
 
         private bool ReplaceFile(AldFileEntry selectedEntry)
@@ -1710,9 +1785,8 @@ namespace ALDExplorer
         private void deleteFileToolStripMenuItem_Click(object sender, EventArgs e)
         {
             if (this.loadedAldFile == null)
-            {
                 return;
-            }
+
             var selectedNodes = GetSelectedNodeAndSubnodes();
             var selectedEntries = GetSelectedEntries();
             DeleteEntries(selectedEntries, selectedNodes);
@@ -1751,9 +1825,7 @@ namespace ALDExplorer
                         int index = pair.Key;
                         var aldFile = pair.Value;
                         if (index >= 0 && index < aldFile.FileEntries.Count)
-                        {
                             aldFile.FileEntries.RemoveAt(index);
-                        }
                     }
 
                     //foreach (var entry in entriesToDelete)
@@ -1774,9 +1846,7 @@ namespace ALDExplorer
                             var node = listView1.Items[i];
                             var nodeEntry = node.Tag as AldFileEntry;
                             if (nodeEntry != null)
-                            {
                                 listView1.Items.RemoveAt(i);
-                            }
                         }
 
                         //foreach (var node in nodesToDelete)
@@ -1810,9 +1880,7 @@ namespace ALDExplorer
         private void deleteCheckedFilesToolStripMenuItem_Click(object sender, EventArgs e)
         {
             if (loadedAldFile == null)
-            {
                 return;
-            }
 
             List<AldFileEntry> entries = GetCheckedEntries();
             var checkedNodes = listView1.CheckedItems.OfType<ListViewItem>().ToArray();
@@ -1828,9 +1896,7 @@ namespace ALDExplorer
         private void ImportNewFiles()
         {
             if (loadedAldFile == null)
-            {
                 return;
-            }
 
             var selectedEntry = GetSelectedEntry();
             int newFileLetter = 1;
@@ -1842,16 +1908,13 @@ namespace ALDExplorer
             {
                 var selectedNode = GetSelectedNode();
                 if (selectedNode == null)
-                {
                     selectedNode = listView1.Items.OfType<ListViewItem>().FirstOrDefault();
-                }
+
                 if (selectedNode != null)
                 {
                     var selectedAldFile = selectedNode.Tag as AldFile;
                     if (selectedAldFile != null)
-                    {
                         newFileLetter = selectedAldFile.FileLetter;
-                    }
                 }
             }
             var aldFile = loadedAldFile.GetAldFileByLetter(newFileLetter);
@@ -1862,9 +1925,7 @@ namespace ALDExplorer
                 openFileDialog.Filter = "All Files (*.*)|*.*";
                 openFileDialog.Multiselect = true;
                 if (openFileDialog.ShowDialog() == DialogResult.OK)
-                {
                     fileNames = openFileDialog.FileNames;
-                }
             }
             if (fileNames == null || fileNames.Length == 0)
                 return;
@@ -1904,9 +1965,7 @@ namespace ALDExplorer
                 entry.FileHeader = null;
                 entry.FileName = prefix + Path.GetFileName(fileName);
                 if (entry.FileName.ToLowerInvariant().EndsWith(".png"))
-                {
                     entry.FileName = Path.ChangeExtension(entry.FileName, newExtension);
-                }
 
                 entry.FileNumber = GetFileNumber(entry.FileName);
                 entry.FileLetter = newFileLetter;
@@ -1974,10 +2033,7 @@ namespace ALDExplorer
             if (maxIndex >= 0)
             {
                 string substr = fileName.Substring(maxIndex, maxLength);
-                if (int.TryParse(substr, out number))
-                {
-
-                }
+                if (int.TryParse(substr, out number)) {}
                 else
                 {
                     number = 0;
@@ -2193,7 +2249,11 @@ namespace ALDExplorer
                     {
                         if (ready == false)
                         {
-                            DisplayEntry(GetSelectedEntry());
+                            var entry = GetSelectedEntry();
+                            if (entry != null) { 
+                                DisplayEntry(entry);
+                                UpdateEntryStatus(entry);
+                            }
                             ready = true;
                         }
                     }
@@ -2203,15 +2263,13 @@ namespace ALDExplorer
 
         private void listView1_Resize(object sender, EventArgs e)
         {
-            //listView1.Columns[0].Width = listView1.ClientRectangle.Width - 20;
+            //listView1.Width = panel1.ClientRectangle.Width;
         }
 
         private void saveAsWithPatchToolStripMenuItem_Click(object sender, EventArgs e)
         {
             if (this.loadedAldFile == null)
-            {
                 return;
-            }
 
             var fileType = this.loadedAldFile.FileType;
             if (fileType == AldFileType.AldFile || fileType == AldFileType.DatFile)
@@ -2239,16 +2297,16 @@ namespace ALDExplorer
                             "A user installing this patch must rename " + aBaseName + " to " + mBaseName + ", then copy over files " + aBaseName + " and " + zBaseName;
                         var dialogResult = MessageBox.Show(this, prompt, "ALDExplorer", MessageBoxButtons.OKCancel, MessageBoxIcon.Information, MessageBoxDefaultButton.Button1);
                         if (dialogResult == DialogResult.Cancel)
-                        {
                             return;
-                        }
                     }
                 }
-
+                listView1.Enabled = false;
                 loadedAldFile.CreatePatch(mFileLetter, zFileLetter);
                 LoadTreeView(true);
+                toolStatusText.Text = "Patch saved:" + aFileName;
+                listView1.Enabled = true;
             }
-            else if (fileType == AldFileType.AFA1File || fileType == AldFileType.AFA2File || fileType == AldFileType.AlkFile)
+            else if (fileType == AldFileType.AFA1File || fileType == AldFileType.AFA2File || fileType == AldFileType.AFA3File || fileType == AldFileType.AlkFile)
             {
                 var saveFileDialog = new SaveFileDialog();
                 saveFileDialog.FileName = loadedAldFile.AldFileName;
@@ -2260,8 +2318,12 @@ namespace ALDExplorer
                         MessageBox.Show("Cannot replace original file with a patch.", "ALD Explorer", MessageBoxButtons.OK, MessageBoxIcon.Stop);
                         return;
                     }
+                    listView1.Enabled = false;
                     loadedAldFile.CreatePatch2(saveFileDialog.FileName);
                     //LoadTreeView(true);
+                    toolStatusText.Text = "Patch saved:" + saveFileDialog.FileName;
+                    listView1.Enabled = true;
+
                 }
             }
         }
@@ -2269,9 +2331,8 @@ namespace ALDExplorer
         private void Save2()
         {
             if (loadedAldFile == null)
-            {
                 return;
-            }
+
             var saveFileDialog = new SaveFileDialog();
             saveFileDialog.FileName = loadedAldFile.AldFileName;
             saveFileDialog.Filter = "AliceSoft Archive Files (*.ALD;*.AFA;*.ALK;*.DAT)|*.ald;*.afa;*.alk;*.dat|All Files (*.*)|*.*";
@@ -2651,6 +2712,45 @@ namespace ALDExplorer
                 }
             }
             
+        }
+
+        private void Form1_sizeChanged(object sender, EventArgs e)
+        {
+            if (!loadProgress.Visible) return;
+            loadProgress.Size = new System.Drawing.Size(panel1.Width - 2, loadProgress.Height);
+        }
+
+        private void backgroundOpener_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+        {
+            /*if (e.Cancelled == true)
+            {
+                toolStatusText.Text = "Canceled!";
+            }
+            else */
+            if (e.Error != null)
+            {
+                toolStatusText.Text = "Error: " + e.Error.Message;
+            }
+            else
+            {
+                toolStatusText.Text = $"Loaded: {Path.GetFileName(loadedAldFile.AldFileName)}, Type: {loadedAldFile.FileType}";
+            }
+            loadProgress.Visible = false;
+            this.saveAsWithPatchToolStripMenuItem.Enabled = false;
+            LoadTreeView(false);
+        }
+
+        private void backgroundOpener_DoWork(object sender, DoWorkEventArgs e)
+        {
+            OpenFile((string)e.Argument, sender as BackgroundWorker);
+        }
+
+        private void backgroundOpener_ProgressChanged(object sender, ProgressChangedEventArgs e)
+        {
+            loadProgress.Value = e.ProgressPercentage;
+            loadProgress.Text = (e.ProgressPercentage.ToString() + "%");
+            toolStatusText.Text = "File: " + ((AldFileCollection.ProgressEventArgs)e.UserState).StateText;
+            System.Threading.Thread.Sleep(20);
         }
     }
 

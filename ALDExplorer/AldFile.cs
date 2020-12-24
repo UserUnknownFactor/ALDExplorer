@@ -28,6 +28,28 @@ namespace ALDExplorer
 
     public class AldFileCollection
     {
+        public class ProgressEventArgs : EventArgs
+        {
+            public int Percentage { get; set; }
+            public string StateText { get; set; }
+        }
+        public event EventHandler<ProgressEventArgs> ProgressChanged;
+        private int calcProgress(int current, int total, int offset)
+        {
+            Debug.Assert(current <= total && total > 0 && offset < total);
+            return (int)((1 - offset / 100) * 100 * current / total);
+        }
+
+        public void reportProgress(int i, int total, string name, int initial = 0)
+        {
+            ProgressChanged?.Invoke(this,
+                new ProgressEventArgs
+                {
+                    Percentage = calcProgress(i, total, initial),
+                    StateText = name
+                });
+        }
+
         public string AldFileName
         {
             get
@@ -106,7 +128,7 @@ namespace ALDExplorer
                 string[] allFiles = AldFile.AldUtil.GetAldOtherFiles(firstAldFile).ToArray();
                 foreach (var fileName in allFiles)
                 {
-                    var aldFile = new AldFile();
+                    var aldFile = new AldFile(this);
                     aldFile.ReadFile(fileName);
                     AldFiles.Add(aldFile);
                     //this.FileEntries.AddRange(aldFile.FileEntries);
@@ -117,7 +139,7 @@ namespace ALDExplorer
                 string[] allFiles = AldFile.AldUtil.GetDatOtherFiles(firstAldFile).ToArray();
                 foreach (var fileName in allFiles)
                 {
-                    var aldFile = new AldFile();
+                    var aldFile = new AldFile(this);
                     aldFile.ReadFile(fileName);
                     AldFiles.Add(aldFile);
                     //this.FileEntries.AddRange(aldFile.FileEntries);
@@ -125,7 +147,7 @@ namespace ALDExplorer
             }
             else
             {
-                var aldFile = new AldFile();
+                var aldFile = new AldFile(this);
                 aldFile.ReadFile(firstAldFile);
                 AldFiles.Add(aldFile);
                 //this.FileEntries.AddRange(aldFile.FileEntries);
@@ -138,17 +160,13 @@ namespace ALDExplorer
         private void ReadIndexBlock(byte[] tableData)
         {
             if (tableData == null || !(this.FileType == AldFileType.AldFile || this.FileType == AldFileType.DatFile))
-            {
                 return;
-            }
 
             //clear all file numbers
             foreach (var aldFile in AldFiles)
             {
                 foreach (var entry in aldFile.FileEntries)
-                {
                     entry.FileNumber = 0;
-                }
             }
 
             var tableSize = tableData.Length;
@@ -168,9 +186,7 @@ namespace ALDExplorer
                         {
                             int aldFileIndex = rawFileIndex - 1;
                             if (aldFileIndex < aldFile.FileEntries.Count)
-                            {
                                 aldFile.FileEntries[aldFileIndex].FileNumber = fileNumber;
-                            }
                         }
                     }
                 }
@@ -191,9 +207,7 @@ namespace ALDExplorer
                         {
                             int aldFileIndex = rawFileIndex - 1;
                             if (aldFileIndex < aldFile.FileEntries.Count)
-                            {
                                 aldFile.FileEntries[aldFileIndex].FileNumber = fileNumber;
-                            }
                         }
                     }
                 }
@@ -217,7 +231,7 @@ namespace ALDExplorer
             var aldFile = this.AldFiles.Where(f => f.FileLetter == fileLetter).FirstOrDefault();
             if (aldFile == null && create)
             {
-                aldFile = new AldFile();
+                aldFile = new AldFile(this);
                 aldFile.FileType = this.FileType;
                 aldFile.FileLetter = fileLetter;
                 aldFile.AldFileName = GetAldFileName(firstFileName, fileLetter);
@@ -303,7 +317,7 @@ namespace ALDExplorer
         {
             //for AFA or ALK files, just output files that have changed.
 
-            AldFile outputFile = new AldFile();
+            AldFile outputFile = new AldFile(this);
             outputFile.AldFileName = outputFileName;
             outputFile.FileType = this.FileType;
             var thisFile = this.AldFiles.FirstOrDefault();
@@ -327,9 +341,7 @@ namespace ALDExplorer
                 }
             }
             if (thisFile.FileEntries.Count == 0)
-            {
                 return false;
-            }
 
             outputFile.SaveFileAndCommit();
             return true;
@@ -487,6 +499,22 @@ namespace ALDExplorer
 
     public class AldFile
     {
+        public AldFileCollection Parent;
+        AldFileType fileType;
+
+        public string AldFileName;
+        public byte[] Footer;
+        public byte[] IndexBlock;
+        public AldFileEntryCollection FileEntries = new AldFileEntryCollection();
+        public int FileLetter;
+
+        public static bool AlwaysRemapImages;
+
+        public AldFile(AldFileCollection p)
+        {
+            Parent = p;
+        }
+
         /*public bool IsDatFile
         {
            get
@@ -507,18 +535,10 @@ namespace ALDExplorer
             }
         }
 
-        AldFileType fileType;
-
-        public string AldFileName;
-        public byte[] Footer;
-        public byte[] IndexBlock;
-        public AldFileEntryCollection FileEntries = new AldFileEntryCollection();
-        public int FileLetter;
-
-        public static bool AlwaysRemapImages;
-
         public void ReadFile(string fileName)
         {
+            Parent.reportProgress(0, 100, Path.GetFileName(fileName));
+
             this.fileType = AldUtil.CheckFileType(fileName);
             this.AldFileName = fileName;
 
@@ -566,6 +586,7 @@ namespace ALDExplorer
                         fileEntry.HeaderAddress = fileAddresses[i];
                         fileEntry.Index = i;
                         FileEntries.Add(fileEntry);
+                        Parent.reportProgress(i, fileAddresses.Length, fileEntry.FileName);
                     }
                 }
             }
@@ -639,6 +660,7 @@ namespace ALDExplorer
                     fileEntry.HeaderAddress = fileAddresses[i];
                     fileEntry.Index = i;
                     FileEntries.Add(fileEntry);
+                    Parent.reportProgress(i, fileAddresses.Length, fileEntry.FileName);
                 }
             }
             else if (fileType == AldFileType.AlkFile)
@@ -724,6 +746,7 @@ namespace ALDExplorer
                         fileEntry.HeaderAddress = fileAddresses[i];
                         fileEntry.Index = i;
                         FileEntries.Add(fileEntry);
+                        Parent.reportProgress(i, fileAddresses.Length, fileEntry.FileName);
                     }
 
                     br.Dispose();
@@ -743,7 +766,14 @@ namespace ALDExplorer
                     {
                         entries = AldUtil.GetAfaFileEntries(fs, ref version);
                     }
+                    Parent.reportProgress(5, 100, fileName);
                     int i = 0;
+                    int len = entries.Length;
+                    int divider = (int)Math.Log10(len) - 1;
+                    if (divider < 1)
+                        divider = 1;
+                    else
+                        divider = (int)Math.Pow(10, divider);
                     foreach (var entry in entries)
                     {
                         entry.Parent = this;
@@ -752,6 +782,8 @@ namespace ALDExplorer
                         entry.HeaderAddress = entry.FileAddress;
                         FileEntries.Add(entry);
                         i++;
+                        if (i % divider == 0)
+                            Parent.reportProgress(i, len, entry.FileName, 5);
                     }
                 }
             }
@@ -759,6 +791,7 @@ namespace ALDExplorer
             {
                 throw new InvalidDataException("ALD file is invalid");
             }
+            Parent.reportProgress(100, 100, "Complete");
         }
 
         internal static class AldUtil
@@ -2425,10 +2458,7 @@ namespace ALDExplorer
         }
     }
 
-    public class AldFileEntryCollection : Collection<AldFileEntry>
-    {
-
-    }
+    public class AldFileEntryCollection : Collection<AldFileEntry> {}
 
     public class AldFileEntry : IWithIndex, IWithParent<AldFile>
     {
@@ -2497,6 +2527,12 @@ namespace ALDExplorer
             get;
             set;
         }
+        public byte[] isFileDecodable
+        {
+            get;
+            set;
+        }
+
         public byte[] GetFileData()
         {
             return GetFileData(false);
@@ -3695,7 +3731,7 @@ namespace ALDExplorer
             m_file.Seek(12, SeekOrigin.Begin);
             var br = new BinaryReader(m_file);
             original = br.ReadBytes((int)m_index_size-12);
-            HexView.Debugger(original.Slice(0, 50));
+            //HexView.Debugger(original.Slice(0, 50));
 
             using (var input = new MemoryStream(original))
             using (var bits = new MsbBitStream(input))
@@ -3711,7 +3747,7 @@ namespace ALDExplorer
                 for (int i = 0; i < packed_size; ++i)
                     packed[i] = (byte)bits.GetBits(8);
             }
-            HexView.Debugger(packed.Slice(0, 50));
+            //HexView.Debugger(packed.Slice(0, 50));
             List<AldFileEntry> dir = new List<AldFileEntry>();
 
             using (var bstr = new MemoryStream(packed))

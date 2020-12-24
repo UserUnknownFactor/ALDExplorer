@@ -40,12 +40,10 @@
             // aldRadioButton
             // 
             this.aldRadioButton.AutoSize = true;
-            this.aldRadioButton.Checked = true;
             this.aldRadioButton.Location = new System.Drawing.Point(12, 12);
             this.aldRadioButton.Name = "aldRadioButton";
             this.aldRadioButton.Size = new System.Drawing.Size(65, 17);
             this.aldRadioButton.TabIndex = 0;
-            this.aldRadioButton.TabStop = true;
             this.aldRadioButton.Text = "ALD File";
             this.aldRadioButton.UseVisualStyleBackColor = true;
             // 
@@ -82,10 +80,12 @@
             // afa2RadioButton
             // 
             this.afa2RadioButton.AutoSize = true;
+            this.afa2RadioButton.Checked = true;
             this.afa2RadioButton.Location = new System.Drawing.Point(12, 104);
             this.afa2RadioButton.Name = "afa2RadioButton";
             this.afa2RadioButton.Size = new System.Drawing.Size(116, 17);
             this.afa2RadioButton.TabIndex = 4;
+            this.afa2RadioButton.TabStop = true;
             this.afa2RadioButton.Text = "AFA File (version 2)";
             this.afa2RadioButton.UseVisualStyleBackColor = true;
             // 
