@@ -742,10 +742,10 @@ namespace ALDExplorer
             saveFileDialog.Filter = "AliceSoft Archive Files (*.ALD;*.AFA;*.ALK;*.DAT)|*.ald;*.afa;*.alk;*.dat|All Files (*.*)|*.*";
             if (saveFileDialog.ShowDialog() == DialogResult.OK)
             {
-                listView1.Enabled = false;
+                listView1.ReadOnly = true;
                 loadedAldFile.SaveFile(saveFileDialog.FileName);
-                toolStatusText.Text = "File saved:" + saveFileDialog.FileName;
-                listView1.Enabled = true;
+                toolStatusText.Text = "File saved: " + saveFileDialog.FileName;
+                listView1.ReadOnly = false;
             }
         }
 
@@ -2300,11 +2300,11 @@ namespace ALDExplorer
                             return;
                     }
                 }
-                listView1.Enabled = false;
+                listView1.ReadOnly = true;
                 loadedAldFile.CreatePatch(mFileLetter, zFileLetter);
                 LoadTreeView(true);
-                toolStatusText.Text = "Patch saved:" + aFileName;
-                listView1.Enabled = true;
+                toolStatusText.Text = "Patch saved: " + aFileName;
+                listView1.ReadOnly = false;
             }
             else if (fileType == AldFileType.AFA1File || fileType == AldFileType.AFA2File || fileType == AldFileType.AFA3File || fileType == AldFileType.AlkFile)
             {
@@ -2318,11 +2318,11 @@ namespace ALDExplorer
                         MessageBox.Show("Cannot replace original file with a patch.", "ALD Explorer", MessageBoxButtons.OK, MessageBoxIcon.Stop);
                         return;
                     }
-                    listView1.Enabled = false;
+                    listView1.ReadOnly = true;
                     loadedAldFile.CreatePatch2(saveFileDialog.FileName);
                     //LoadTreeView(true);
-                    toolStatusText.Text = "Patch saved:" + saveFileDialog.FileName;
-                    listView1.Enabled = true;
+                    toolStatusText.Text = "Patch saved: " + saveFileDialog.FileName;
+                    listView1.ReadOnly = false;
 
                 }
             }

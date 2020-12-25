@@ -1,5 +1,23 @@
 ﻿namespace ALDExplorer
 {
+    public class ExListView : System.Windows.Forms.ListView {
+      private bool mCreating;
+      private bool mReadOnly;
+      protected override void OnHandleCreated(System.EventArgs e) {
+        mCreating = true;
+        base.OnHandleCreated(e);
+        mCreating = false;
+      }
+      public bool ReadOnly {
+        get { return mReadOnly; }
+        set { mReadOnly = value; }
+      }
+      protected override void OnItemCheck(System.Windows.Forms.ItemCheckEventArgs e) {
+        if (!mCreating && mReadOnly) e.NewValue = e.CurrentValue;
+        base.OnItemCheck(e);
+      }
+    }
+
     partial class Form1
     {
         /// <summary>
@@ -32,7 +50,7 @@
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Form1));
             this.splitContainer1 = new System.Windows.Forms.SplitContainer();
             this.panel1 = new System.Windows.Forms.Panel();
-            this.listView1 = new System.Windows.Forms.ListView();
+            this.listView1 = new ALDExplorer.ExListView();
             this.columnHeader1 = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.contextMenuStrip1 = new System.Windows.Forms.ContextMenuStrip(this.components);
             this.exportFileToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -134,6 +152,7 @@
             this.listView1.Location = new System.Drawing.Point(0, 20);
             this.listView1.Name = "listView1";
             this.listView1.OwnerDraw = true;
+            this.listView1.ReadOnly = false;
             this.listView1.ShowItemToolTips = true;
             this.listView1.Size = new System.Drawing.Size(311, 407);
             this.listView1.SmallImageList = this.imageList1;
@@ -604,7 +623,7 @@
         private System.Windows.Forms.ToolStripMenuItem copyToClipboardToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem exportTextFromSCOFilesToolStripMenuItem;
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem6;
-        private System.Windows.Forms.ListView listView1;
+        private ExListView listView1;
         private System.Windows.Forms.ColumnHeader columnHeader1;
         private System.Windows.Forms.ImageList imageList1;
         private System.Windows.Forms.ToolStripMenuItem saveAsWithPatchToolStripMenuItem;
